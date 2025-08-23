@@ -2,7 +2,7 @@ import io, requests, sounddevice as sd, soundfile as sf
 
 API = "http://localhost:8000/converse"  # via your SSH tunnel
 SR = 16000
-SECONDS = 4
+SECONDS = 5
 
 print("Recording... speak now!")
 audio = sd.rec(int(SECONDS * SR), samplerate=SR, channels=1, dtype="float32")
