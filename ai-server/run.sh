@@ -31,7 +31,7 @@ fi
 export WHISPER_MODEL=medium.en
 
 # --- Piper (TTS) check ---
-export PIPER_BIN=/root/piper/piper
+export PIPER_BIN=/root/piper/build/piper
 export PIPER_VOICE=/root/piper/voices/en_US-amy-low.onnx
 
 if [ ! -x "$PIPER_BIN" ]; then

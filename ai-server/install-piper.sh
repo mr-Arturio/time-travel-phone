@@ -15,6 +15,11 @@ cd piper
 echo "🔨 Building Piper..."
 make
 
+# Ensure binary is available at /root/piper/piper
+if [ -f "build/piper" ]; then
+  cp build/piper ./piper
+fi
+
 echo "🗣️ Downloading voice model..."
 mkdir -p voices
 VOICE_PATH="voices/en_US-amy-low.onnx"
