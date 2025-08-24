@@ -30,9 +30,22 @@ fi
 # Whisper model
 export WHISPER_MODEL=medium.en
 
-# Piper (TTS)
+# --- Piper (TTS) check ---
 export PIPER_BIN=/root/piper/piper
 export PIPER_VOICE=/root/piper/voices/en_US-amy-low.onnx
 
-# Run server
+if [ ! -x "$PIPER_BIN" ]; then
+  echo "❌ Piper binary not found at $PIPER_BIN"
+  echo "👉 Please run ./install-piper.sh first"
+  exit 1
+fi
+
+if [ ! -f "$PIPER_VOICE" ]; then
+  echo "❌ Piper voice not found at $PIPER_VOICE"
+  echo "👉 Please run ./install-piper.sh to download voices"
+  exit 1
+fi
+
+# --- Run server ---
+echo "🚀 Starting FastAPI server with Whisper + Piper..."
 uvicorn server:app --host 0.0.0.0 --port 8000
