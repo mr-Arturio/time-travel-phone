@@ -35,14 +35,14 @@ async def converse(persona: str = Form(...), audio: UploadFile = Form(...)):
         tmp_path = tmp.name
 
     # 3) transcribe (quick settings)
-segments, _info = model.transcribe(
-    tmp_path,
-    beam_size=5,                     
-    vad_filter=True,
-    vad_parameters={"min_silence_duration_ms": 300},
-    language="en",
-    initial_prompt="Casual, modern English conversation.",
-)
+    segments, _info = model.transcribe(
+        tmp_path,
+        beam_size=5,
+        vad_filter=True,
+        vad_parameters={"min_silence_duration_ms": 300},
+        language="en",
+        initial_prompt="Casual, modern English conversation.",
+    )
     transcript = "".join(s.text for s in segments).strip()
 
     # 4) cleanup

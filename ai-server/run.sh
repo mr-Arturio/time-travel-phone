@@ -3,8 +3,10 @@ set -e
 
 cd ~/time-travel-phone/ai-server
 
-# Recreate venv if missing
-if [ ! -d ".venv" ]; then
+# Always recreate venv if missing or broken
+if [ ! -f ".venv/bin/activate" ]; then
+  echo "⚠️ venv missing or broken — recreating..."
+  rm -rf .venv
   python3 -m venv .venv
 fi
 
