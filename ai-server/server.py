@@ -11,8 +11,12 @@ app = FastAPI()
 #   WHISPER_MODEL  : "small.en" (default), "medium.en", "large-v3", etc.
 #   WHISPER_DEVICE : "cpu" (safe) or "cuda" (GPU, needs cuDNN)
 WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "small.en")
-WHISPER_DEVICE = os.environ.get("WHISPER_DEVICE", "cpu")  # default to CPU so it won't crash
-WHISPER_COMPUTE = "int8" if WHISPER_DEVICE == "cpu" else "float16"
+WHISPER_DEVICE = os.environ.get("WHISPER_DEVICE", "cpu")  # "cpu" or "cuda"
+# allow override; else pick a sensible default
+WHISPER_COMPUTE = os.environ.get(
+    "WHISPER_COMPUTE",
+    "int8" if WHISPER_DEVICE == "cpu" else "float16"
+)
 
 model = WhisperModel(WHISPER_MODEL, device=WHISPER_DEVICE, compute_type=WHISPER_COMPUTE)
 
@@ -31,13 +35,14 @@ async def converse(persona: str = Form(...), audio: UploadFile = Form(...)):
         tmp_path = tmp.name
 
     # 3) transcribe (quick settings)
-    segments, _info = model.transcribe(
-        tmp_path,
-        beam_size=1,
-        vad_filter=True,
-        vad_parameters={"min_silence_duration_ms": 300},
-        language="en",  # remove to autodetect
-    )
+segments, _info = model.transcribe(
+    tmp_path,
+    beam_size=5,                     
+    vad_filter=True,
+    vad_parameters={"min_silence_duration_ms": 300},
+    language="en",
+    initial_prompt="Casual, modern English conversation.",
+)
     transcript = "".join(s.text for s in segments).strip()
 
     # 4) cleanup
