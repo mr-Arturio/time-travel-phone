@@ -1,23 +1,23 @@
 #!/bin/bash
 set -euo pipefail
 
+# Always run from this script’s folder
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Always recreate venv if missing or broken
+# (Re)create venv if missing/broken
 if [ ! -f ".venv/bin/activate" ]; then
   echo "⚠️ venv missing or broken — recreating..."
   rm -rf .venv
   python3 -m venv .venv
 fi
-
 source .venv/bin/activate
 
-# Upgrade pip + install deps
+# Deps
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 
-# --- Detect if cuDNN is installed ---
+# Detect cuDNN → choose CPU/GPU for Whisper
 if ldconfig -p | grep -q "libcudnn_ops_infer.so.8"; then
   echo "✅ cuDNN found — using GPU (cuda)"
   export WHISPER_DEVICE=cuda
@@ -27,26 +27,43 @@ else
   export WHISPER_DEVICE=cpu
   export WHISPER_COMPUTE=float32
 fi
-
-# Whisper model
 export WHISPER_MODEL=medium.en
 
-# --- Piper (TTS) check ---
-export PIPER_BIN=/root/piper/build/piper
+# Piper (TTS)
+# Try both possible build locations
+if [ -x /root/piper/piper ]; then
+  export PIPER_BIN=/root/piper/piper
+else
+  export PIPER_BIN=/root/piper/build/piper
+fi
 export PIPER_VOICE=/root/piper/voices/en_US-amy-low.onnx
+export PIPER_JSON="${PIPER_VOICE}.json"
 
+# eSpeak NG data path for Piper (and create a compat symlink if needed)
+if [ -d /usr/lib/x86_64-linux-gnu/espeak-ng-data ]; then
+  export ESPEAKNG_DATA_PATH=/usr/lib/x86_64-linux-gnu/espeak-ng-data
+else
+  export ESPEAKNG_DATA_PATH=/usr/share/espeak-ng-data
+fi
+# Ensure /usr/share path exists (some tools hardcode it)
+if [ ! -e /usr/share/espeak-ng-data ] && [ -d /usr/lib/x86_64-linux-gnu/espeak-ng-data ]; then
+  ln -s /usr/lib/x86_64-linux-gnu/espeak-ng-data /usr/share/espeak-ng-data || true
+fi
+
+# Sanity checks
 if [ ! -x "$PIPER_BIN" ]; then
   echo "❌ Piper binary not found at $PIPER_BIN"
-  echo "👉 Please run ./install-piper.sh first"
+  echo "👉 Run ./install-piper.sh first (it builds Piper and fetches a voice)"
+  exit 1
+fi
+if [ ! -f "$PIPER_VOICE" ] || [ ! -f "$PIPER_JSON" ]; then
+  echo "❌ Piper voice or JSON missing:"
+  echo "   $PIPER_VOICE"
+  echo "   $PIPER_JSON"
+  echo "👉 Re-run ./install-piper.sh (or download from HF) to install voices"
   exit 1
 fi
 
-if [ ! -f "$PIPER_VOICE" ]; then
-  echo "❌ Piper voice not found at $PIPER_VOICE"
-  echo "👉 Please run ./install-piper.sh to download voices"
-  exit 1
-fi
-
-# --- Run server ---
+# Run server
 echo "🚀 Starting FastAPI server with Whisper + Piper..."
 uvicorn server:app --host 0.0.0.0 --port 8000
