@@ -1,6 +1,6 @@
 Run:
 Connect to your pod using SSH
-git clone if needed/pull
+git clone if needed/pull - git clone https://github.com/mr-Arturio/time-travel-phone.git
 cd into
 chmod +x run.sh      # only needed first time
 ./run.sh

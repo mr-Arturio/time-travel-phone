@@ -1,7 +1,8 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-cd ~/time-travel-phone/ai-server
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
 # Always recreate venv if missing or broken
 if [ ! -f ".venv/bin/activate" ]; then
