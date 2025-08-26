@@ -1,37 +1,53 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-echo "🚀 Installing Piper dependencies..."
-apt-get update
-apt-get install -y build-essential espeak-ng cmake wget git
+echo "🧰 Installing Piper build/runtime deps..."
+apt-get update -y
+DEBIAN_FRONTEND=noninteractive apt-get install -y \
+  build-essential cmake git wget curl \
+  espeak-ng espeak-ng-data libespeak-ng1
 
-echo "📥 Cloning Piper..."
+echo "📥 Cloning/Updating Piper..."
 cd /root
-if [ ! -d "piper" ]; then
+if [ ! -d piper ]; then
   git clone https://github.com/rhasspy/piper.git
 fi
-cd piper
+cd /root/piper
 
 echo "🔨 Building Piper..."
-make
+make                      # produces /root/piper/build/piper
+ln -sf build/piper ./piper # convenience: /root/piper/piper also works
 
-# Ensure binary is available at /root/piper/piper
-if [ -f "build/piper" ]; then
-  cp build/piper ./piper
+# Ensure tools that expect /usr/share/... can find eSpeak data
+if [ ! -e /usr/share/espeak-ng-data ] && [ -d /usr/lib/x86_64-linux-gnu/espeak-ng-data ]; then
+  ln -s /usr/lib/x86_64-linux-gnu/espeak-ng-data /usr/share/espeak-ng-data || true
 fi
 
-echo "🗣️ Downloading voice model..."
-mkdir -p voices
-VOICE_PATH="voices/en_US-amy-low.onnx"
-VOICE_URL="https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/low/en_US-amy-low.onnx"
+echo "🗣️ Downloading Amy (en_US) voice (ONNX + JSON)..."
+mkdir -p /root/piper/voices
+cd /root/piper/voices
 
-if [ ! -f "$VOICE_PATH" ]; then
-  echo "Downloading Amy (US English, low quality) voice..."
-  wget "$VOICE_URL" -O "$VOICE_PATH"
-else
-  echo "Voice model already exists: $VOICE_PATH"
+VOICE="en_US-amy-low.onnx"
+VOICE_JSON="${VOICE}.json"
+BASE_URL="https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/low"
+
+if [ ! -f "$VOICE" ]; then
+  wget -O "$VOICE"      "${BASE_URL}/${VOICE}?download=1"
+fi
+if [ ! -f "$VOICE_JSON" ]; then
+  wget -O "$VOICE_JSON" "${BASE_URL}/${VOICE_JSON}?download=1"
 fi
 
-echo "✅ Piper installed successfully!"
-echo "Binary: /root/piper/piper"
-echo "Voice:  /root/piper/$VOICE_PATH"
+echo "🔎 Verifying files..."
+ls -lh "/root/piper/build/piper" "/root/piper/voices/$VOICE" "/root/piper/voices/$VOICE_JSON"
+
+echo "🎧 Quick smoke test (creates /tmp/piper-install-test.wav)..."
+echo "hello from piper" | /root/piper/build/piper \
+  -m "/root/piper/voices/$VOICE" \
+  -c "/root/piper/voices/$VOICE_JSON" \
+  -f /tmp/piper-install-test.wav || true
+ls -lh /tmp/piper-install-test.wav || true
+
+echo "✅ Piper install complete."
+echo "   Binary: /root/piper/build/piper (also /root/piper/piper)"
+echo "   Voice : /root/piper/voices/$VOICE"

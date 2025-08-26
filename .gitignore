@@ -10,3 +10,4 @@ __pycache__/
 # Audio test files
 *.wav
 tiny_client/*.wav
+
