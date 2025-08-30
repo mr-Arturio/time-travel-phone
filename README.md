@@ -26,22 +26,24 @@ cd /time-travel-phone/ai-server
 chmod +x install-llm.sh
 ./install-llm.sh
 
-export VLLM_MODEL="gpt-oss-20B"   # or local path to weights
-python -m vllm.entrypoints.openai.api_server \
-  --model "$VLLM_MODEL" \
-  --host 127.0.0.1 --port 8001
 
-In server.py:
+## Fresh Pod:
+```
+git clone https://github.com/mr-Arturio/time-travel-phone.git
+cd time-travel-phone/ai-server
+chmod +x install-piper.sh
+./install-piper.sh           # one-time Piper build + voice
+chmod +x ../install-llm.sh 2>/dev/null || true
+../install-llm.sh            # one-time vLLM install into venv
+chmod +x run.sh
+./run.sh                     # one-time deps + sanity (or just: pip install -r requirements.txt)
+```
 
-from llm_backends import chat
+##Daily start
+```
+cd /time-travel-phone/ai-server
+bash env.auto.sh             # sets caches/TMP to /workspace (or $HOME)
+./start_vllm.sh              # brings up vLLM on :8011
+./start_api.sh               # brings up FastAPI on :8000
 
-def persona_reply(name, style, transcript):
-    if not transcript:
-        return "I didn't catch that. Please repeat."
-    system = f"You are {name}. Stay concise, natural, and on-topic. Style: {style}"
-    user   = transcript
-    try:
-        return chat(system, user)
-    except Exception:
-        # graceful fallback
-        return f"{name} here. {clean_and_punctuate(transcript)}"
+```
