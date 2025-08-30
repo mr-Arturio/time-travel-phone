@@ -1,4 +1,7 @@
 #!/bin/bash
+export LLM_ENDPOINT="http://127.0.0.1:8001/v1"
+export LLM_MODEL="gpt-oss-20B" 
+
 set -euo pipefail
 
 # Always run from this script’s folder

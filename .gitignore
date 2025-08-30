@@ -11,3 +11,6 @@ __pycache__/
 *.wav
 tiny_client/*.wav
 
+ai-server/.venv/
+*.onnx
+*.onnx.json
