@@ -5,13 +5,7 @@ from datetime import datetime, timezone
 from collections import deque
 import numpy as np, soundfile as sf
 from faster_whisper import WhisperModel
-from collections import deque
-from datetime import datetime
-import html
 
-# ---- metrics ring buffer ----
-METRICS_MAX = int(os.environ.get("METRICS_MAX", "50"))
-METRICS: "deque[dict]" = deque(maxlen=METRICS_MAX)
 
 # vLLM backend
 try:
@@ -35,9 +29,9 @@ PIPER_EXTRA_ARGS = os.environ.get("PIPER_EXTRA_ARGS", "").strip()  # pass-throug
 # Personas
 PERSONAS_PATH = os.environ.get("PERSONAS_PATH", "personas.json")
 
-# Metrics
-METRICS_CAP = int(os.environ.get("METRICS_CAP", "50"))
-_METRICS = deque(maxlen=METRICS_CAP)
+# ---- metrics ring buffer (unified) ----
+METRICS_CAP = int(os.environ.get("METRICS_CAP", os.environ.get("METRICS_MAX", "50")))
+METRICS: "deque[dict]" = deque(maxlen=METRICS_CAP)
 
 # ---------- Load Whisper ----------
 model = WhisperModel(WHISPER_MODEL, device=WHISPER_DEVICE, compute_type=WHISPER_COMPUTE)
@@ -160,7 +154,7 @@ def _persona_lookup(persona_key: str) -> dict:
 
 # ---------- Metrics ----------
 def _push_metric(m: dict) -> None:
-    _METRICS.append(m)
+    METRICS.append(m)
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -189,21 +183,35 @@ def health():
         "llm_model": llm_model,
         "llm_ok": llm_ok,
         "personas_loaded": bool(_PERSONAS),
-        "metrics_buffer": len(_METRICS),
+        "metrics_buffer": len(METRICS),
     }
 
 # ---------- Mini dashboard ----------
 @app.get("/metrics")
 def metrics():
-    return JSONResponse(list(_METRICS))
+    items = list(METRICS)
+    n = len(items)
+    def avg(key: str) -> int:
+        return int(sum(x["ms"].get(key, 0) for x in items) / n) if n else 0
+    return JSONResponse({
+        "n": n,
+        "avg": {
+            "stt":   avg("stt"),
+            "llm":   avg("llm"),
+            "tts":   avg("tts"),
+            "total": avg("total"),
+        },
+        "items": items[::-1],  # newest first
+    })
 
 @app.get("/ui")
 def ui():
     # tiny HTML with auto-refresh
-    rows = []
+    items = list(METRICS)[-50:][::-1]
     def esc(s: str) -> str:
         return (s or "").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
-    for m in list(_METRICS)[-50:][::-1]:
+    rows = []
+    for m in items:
         rows.append(
             f"<tr>"
             f"<td>{esc(m.get('ts'))}</td>"
@@ -255,8 +263,14 @@ async def converse(persona: str = Form(...), audio: UploadFile = Form(...)):
     persona_info = _persona_lookup(persona)
     system_prompt = persona_info.get("system") or f"You are {persona_info.get('name', persona)}. Be concise."
     # Allow per-persona voice override
-    voice_path = persona_info.get("voice", PIPER_VOICE)
-    voice_json = f"{voice_path}.json" if not voice_path.endswith(".json") else voice_path
+   voice_path = persona_info.get("voice", PIPER_VOICE)              # expects .onnx
+  voice_json = persona_info.get("voice_json", f"{voice_path}.json") # optional explicit override
+  # safety: if user mistakenly set .json in 'voice', try to recover
+  if voice_path.endswith(".json"):
+    guess = voice_path[:-5]  # strip .json
+    if os.path.exists(guess):
+        voice_path = guess
+
 
     # 1) read upload
     wav_bytes = await audio.read()
@@ -285,9 +299,9 @@ async def converse(persona: str = Form(...), audio: UploadFile = Form(...)):
 
     # 4) LLM (vLLM if up, else fallback stub)
     t1 = time.time()
+    used_llm = False
     reply_text = ""
     if transcript:
-        used_llm = False
         if llm_backends and llm_backends.health():
             try:
                 reply_text = llm_backends.chat(system_prompt, transcript)
@@ -306,7 +320,6 @@ async def converse(persona: str = Form(...), audio: UploadFile = Form(...)):
         audio_bytes = piper_tts_multi(reply_text, voice_path, voice_json, target_sr=None, pause_ms=120)
         buf = io.BytesIO(audio_bytes)
     except Exception:
-        # fallback to 1s silence
         sr = 16000
         y = np.zeros(int(sr * 1.0), dtype=np.float32)
         buf = io.BytesIO()
@@ -315,21 +328,20 @@ async def converse(persona: str = Form(...), audio: UploadFile = Form(...)):
     t_tts = time.time() - t2
 
     # 6) metrics
-    metric = {
-        "ts": _now_iso(),
+    METRICS.append({
+        "ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "persona": persona_info.get("id", persona),
         "name": persona_info.get("name", persona),
         "transcript": transcript,
         "reply_preview": reply_text[:500],
         "ms": {
-            "stt": int(t_stt * 1000),
-            "llm": int(t_llm * 1000),
-            "tts": int(t_tts * 1000),
+            "stt":   int(t_stt * 1000),
+            "llm":   int(t_llm * 1000),
+            "tts":   int(t_tts * 1000),
             "total": int((time.time() - t_all0) * 1000),
         },
-        "llm_used": bool(llm_backends and llm_backends.health()),
-    }
-    _push_metric(metric)
+        "llm_used": used_llm,
+    })
 
     # 7) headers
     headers = {
@@ -337,11 +349,12 @@ async def converse(persona: str = Form(...), audio: UploadFile = Form(...)):
         "X-Transcript": transcript[:1000] if transcript else "",
         "X-Whisper-Model": WHISPER_MODEL,
         "X-Device": WHISPER_DEVICE,
-        "X-LLM-Endpoint": getattr(llm_backends, "ENDPOINT", ""),
-        "X-LLM-Model": getattr(llm_backends, "MODEL", ""),
-        "X-Timing-STT-ms": str(metric["ms"]["stt"]),
-        "X-Timing-LLM-ms": str(metric["ms"]["llm"]),
-        "X-Timing-TTS-ms": str(metric["ms"]["tts"]),
-        "X-Timing-Total-ms": str(metric["ms"]["total"]),
+        "X-LLM-Endpoint": getattr(llm_backends, "ENDPOINT", "") if llm_backends else "",
+        "X-LLM-Model": getattr(llm_backends, "MODEL", "") if llm_backends else "",
+        "X-LLM-Used": "1" if used_llm else "0",
+        "X-Timing-STT-ms": str(int(t_stt * 1000)),
+        "X-Timing-LLM-ms": str(int(t_llm * 1000)),
+        "X-Timing-TTS-ms": str(int(t_tts * 1000)),
+        "X-Timing-Total-ms": str(int((time.time() - t_all0) * 1000)),
     }
     return StreamingResponse(buf, media_type="audio/wav", headers=headers)
