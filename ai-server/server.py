@@ -263,13 +263,13 @@ async def converse(persona: str = Form(...), audio: UploadFile = Form(...)):
     persona_info = _persona_lookup(persona)
     system_prompt = persona_info.get("system") or f"You are {persona_info.get('name', persona)}. Be concise."
     # Allow per-persona voice override
-   voice_path = persona_info.get("voice", PIPER_VOICE)              # expects .onnx
-  voice_json = persona_info.get("voice_json", f"{voice_path}.json") # optional explicit override
-  # safety: if user mistakenly set .json in 'voice', try to recover
-  if voice_path.endswith(".json"):
-    guess = voice_path[:-5]  # strip .json
-    if os.path.exists(guess):
-        voice_path = guess
+    voice_path = persona_info.get("voice", PIPER_VOICE)              # expects .onnx
+    voice_json = persona_info.get("voice_json", f"{voice_path}.json") # optional explicit override
+    # safety: if user mistakenly set .json in 'voice', try to recover
+    if voice_path.endswith(".json"):
+        guess = voice_path[:-5]  # strip .json
+        if os.path.exists(guess):
+            voice_path = guess
 
 
     # 1) read upload
@@ -294,8 +294,10 @@ async def converse(persona: str = Form(...), audio: UploadFile = Form(...)):
     t_stt = time.time() - t0
 
     # cleanup temp
-    try: os.unlink(tmp_path)
-    except Exception: pass
+    try:
+        os.unlink(tmp_path)
+    except Exception:
+        pass
 
     # 4) LLM (vLLM if up, else fallback stub)
     t1 = time.time()
