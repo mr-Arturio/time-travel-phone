@@ -1,6 +1,6 @@
 #!/bin/bash
-export LLM_ENDPOINT="http://127.0.0.1:8001/v1"
-export LLM_MODEL="gpt-oss-20B" 
+export LLM_ENDPOINT="${LLM_ENDPOINT:-http://127.0.0.1:8011/v1}"
+export LLM_MODEL="${LLM_MODEL:-openai/gpt-oss-20b}"
 
 set -euo pipefail
 

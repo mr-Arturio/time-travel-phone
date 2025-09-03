@@ -5,6 +5,13 @@ from datetime import datetime, timezone
 from collections import deque
 import numpy as np, soundfile as sf
 from faster_whisper import WhisperModel
+from collections import deque
+from datetime import datetime
+import html
+
+# ---- metrics ring buffer ----
+METRICS_MAX = int(os.environ.get("METRICS_MAX", "50"))
+METRICS: "deque[dict]" = deque(maxlen=METRICS_MAX)
 
 # vLLM backend
 try:
