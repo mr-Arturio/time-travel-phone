@@ -1,10 +1,13 @@
 from fastapi import FastAPI, UploadFile, Form
-from fastapi.responses import StreamingResponse, HTMLResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 import io, os, re, tempfile, subprocess, time, json, pathlib, shlex
 from datetime import datetime, timezone
 from collections import deque
 import numpy as np, soundfile as sf
 from faster_whisper import WhisperModel
+import uuid
+from events import sse_router, event_router, event_bus
+
 
 
 # vLLM backend
@@ -14,6 +17,8 @@ except Exception:
     llm_backends = None  # will gracefully fallback
 
 app = FastAPI()
+app.include_router(sse_router)
+app.include_router(event_router)
 
 # ---------- Config / Env ----------
 WHISPER_MODEL  = os.environ.get("WHISPER_MODEL", "small.en")
@@ -204,73 +209,23 @@ def metrics():
         "items": items[::-1],  # newest first
     })
 
-@app.get("/ui")
-def ui():
-    # tiny HTML with auto-refresh
-    items = list(METRICS)[-50:][::-1]
-    def esc(s: str) -> str:
-        return (s or "").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
-    rows = []
-    for m in items:
-        rows.append(
-            f"<tr>"
-            f"<td>{esc(m.get('ts'))}</td>"
-            f"<td>{esc(m.get('persona'))}</td>"
-            f"<td class='tx'>{esc(m.get('transcript',''))}</td>"
-            f"<td class='tx'>{esc(m.get('reply_preview',''))}</td>"
-            f"<td>{m.get('ms',{}).get('stt')}</td>"
-            f"<td>{m.get('ms',{}).get('llm')}</td>"
-            f"<td>{m.get('ms',{}).get('tts')}</td>"
-            f"<td>{m.get('ms',{}).get('total')}</td>"
-            f"</tr>"
-        )
-    html = f"""<!doctype html>
-<html><head>
-<meta charset="utf-8" />
-<meta http-equiv="refresh" content="2" />
-<title>Time-Travel Phone — Metrics</title>
-<style>
-body {{ font-family: system-ui, sans-serif; padding: 12px; }}
-table {{ border-collapse: collapse; width: 100%; }}
-th, td {{ border: 1px solid #ddd; padding: 6px 8px; vertical-align: top; }}
-th {{ background: #f6f6f6; position: sticky; top: 0; }}
-td.tx {{ max-width: 520px; white-space: pre-wrap; }}
-small.mono {{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #555; }}
-</style>
-</head>
-<body>
-<h2>Time-Travel Phone — Metrics</h2>
-<div><small class="mono">/metrics returns JSON; this page auto-refreshes every 2s</small></div>
-<table>
-<thead>
-<tr>
-  <th>Time (UTC)</th><th>Persona</th><th>Transcript</th><th>Reply (preview)</th>
-  <th>STT ms</th><th>LLM ms</th><th>TTS ms</th><th>Total ms</th>
-</tr>
-</thead>
-<tbody>
-{''.join(rows)}
-</tbody>
-</table>
-</body></html>
-"""
-    return HTMLResponse(html)
 
 # ---------- Main endpoint ----------
-@app.post("/converse")
+@@app.post("/converse")
 async def converse(persona: str = Form(...), audio: UploadFile = Form(...)):
     t_all0 = time.time()
     persona_info = _persona_lookup(persona)
+    call_id = str(uuid.uuid4())
+    event_bus.emit("phone_start", "Call started", call_id, persona=persona_info.get("id", persona))
+
     system_prompt = persona_info.get("system") or f"You are {persona_info.get('name', persona)}. Be concise."
     # Allow per-persona voice override
-    voice_path = persona_info.get("voice", PIPER_VOICE)              # expects .onnx
+    voice_path = persona_info.get("voice", PIPER_VOICE)               # expects .onnx
     voice_json = persona_info.get("voice_json", f"{voice_path}.json") # optional explicit override
-    # safety: if user mistakenly set .json in 'voice', try to recover
     if voice_path.endswith(".json"):
         guess = voice_path[:-5]  # strip .json
         if os.path.exists(guess):
             voice_path = guess
-
 
     # 1) read upload
     wav_bytes = await audio.read()
@@ -281,6 +236,7 @@ async def converse(persona: str = Form(...), audio: UploadFile = Form(...)):
         tmp_path = tmp.name
 
     # 3) transcribe
+    event_bus.emit("stt_start", "Transcribing…", call_id)
     t0 = time.time()
     segments, _info = model.transcribe(
         tmp_path,
@@ -292,6 +248,8 @@ async def converse(persona: str = Form(...), audio: UploadFile = Form(...)):
     )
     transcript = "".join(s.text for s in segments).strip()
     t_stt = time.time() - t0
+    event_bus.emit("stt_done", "Transcript ready", call_id,
+                   ms=int(t_stt * 1000), transcript=transcript)
 
     # cleanup temp
     try:
@@ -345,7 +303,7 @@ async def converse(persona: str = Form(...), audio: UploadFile = Form(...)):
         "llm_used": used_llm,
     })
 
-    # 7) headers
+    # 7) headers + end event
     headers = {
         "X-Persona": persona_info.get("id", persona),
         "X-Transcript": transcript[:1000] if transcript else "",
@@ -359,4 +317,8 @@ async def converse(persona: str = Form(...), audio: UploadFile = Form(...)):
         "X-Timing-TTS-ms": str(int(t_tts * 1000)),
         "X-Timing-Total-ms": str(int((time.time() - t_all0) * 1000)),
     }
+    headers["X-Call-Id"] = call_id
+    event_bus.emit("call_end", "Completed", call_id, total_ms=int((time.time() - t_all0) * 1000))
+
     return StreamingResponse(buf, media_type="audio/wav", headers=headers)
+
