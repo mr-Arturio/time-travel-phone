@@ -33,3 +33,45 @@ bash env.auto.sh             # sets caches/TMP to /workspace (or $HOME)
 ./start_api.sh               # brings up FastAPI on :8000
 
 ```
+
+
+```
+L1 ── 1kΩ ──> (row of #17)
+                   |
+                 0.1µF
+                   |
+                 (GND row)
+F  ───────────────────────────────────────────────> (GND row)
+```
+## For the Hook
+Do this (Pi power OFF):
+- F → GND row on the Cobbler (not the rail):
+Find a T-Cobbler pin labeled GND. Put the F wire into the same 5-hole row as that GND pin (so F is directly on ground). Do not use the +/– rails for this step since you don’t have jumpers.
+- L1 + 1 kΩ → #17 row (inner rows only):
+- Pick any empty inner row (not the rails). Put L1 in one hole of that row.
+- Put one leg of the 1 kΩ resistor in the same row as L1 (so L1 and that leg touch electrically).
+- Put the other leg of the resistor in the row that lines up with #17 on the T-Cobbler (GPIO17). Make sure it’s the same side of the trench as the label.
+- Capacitor 0.1 µF from #17 row → any GND row:
+- One leg of the cap into the #17 row.
+- The other leg into a GND row (you can use the same GND row you used for F).
+
+## For the Dial
+- Dial_B wire into the  GND row on the Cobbler
+- Choose an empty inner row (not the long +/– rails).
+- Insert Dial_A into that row.
+- Insert one leg of a 1 kΩ resistor into that same row (so Dial_A and that resistor leg are tied together).
+- Find #27 on the Cobbler
+- Bend and insert the other leg of the resistor into the row that lines up with #27.
+- Take a 0.1 µF (“104”) capacitor.
+- Put one leg in the #27 row.
+- Put the other leg in any GND row .
+
+```
+Dial_B ────────────────────────────────> [GND row with a T-Cobbler GND pin]
+
+Dial_A ──[1 kΩ]──> [#27 row on T-Cobbler]
+                          │
+                      [0.1 µF]
+                          │
+                        [GND row]
+```
