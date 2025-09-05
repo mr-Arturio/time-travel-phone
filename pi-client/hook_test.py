@@ -1,9 +1,9 @@
 from gpiozero import Button
 from signal import pause
 
-# Your wiring: F -> GND, L1 -> (1kΩ) -> GPIO17, plus 0.1uF from GPIO17->GND
+# Your wiring: White -> GND, Black -> (1kΩ) -> GPIO13, plus 0.1uF from GPIO13->GND
 # Note: Debounce bumped to 50 ms to tame mechanical chatter.
-hook = Button(17, pull_up=True, bounce_time=0.05)
+hook = Button(13, pull_up=True, bounce_time=0.05)
 
 def handset_on_cradle():
     print("Handset ON cradle")     # switch closed to GND

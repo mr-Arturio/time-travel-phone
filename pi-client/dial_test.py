@@ -3,8 +3,8 @@ from signal import pause
 import time
 
 # Dial pulses are normally-closed to GND and "open" as the dial returns.
-# Wiring: Dial_B -> GND, Dial_A -> (1k) -> GPIO27, plus 0.1uF from GPIO27->GND
-dial = Button(27, pull_up=True, bounce_time=0.002)  # 2 ms software debounce
+# Wiring: Blue -> GND, Green -> (1k) -> GPIO20, plus 0.1uF from GPIO20->GND
+dial = Button(20, pull_up=True, bounce_time=0.002)  # 2 ms software debounce
 
 digit = 0
 last  = time.time()

@@ -3,11 +3,11 @@ from threading import Timer
 from signal import pause
 
 # Wiring recap:
-# HOOK: F -> GND, L1 -> (1k) -> GPIO17, + 0.1uF GPIO17->GND
-# DIAL: Dial_B -> GND, Dial_A -> (1k) -> GPIO27, + 0.1uF GPIO27->GND
+# HOOK: White -> GND, Black -> (1k) -> GPIO13, + 0.1uF GPIO13->GND
+# DIAL: Blue -> GND, Green -> (1k) -> GPIO20, + 0.1uF GPIO20->GND
 
-hook = Button(17, pull_up=True, bounce_time=0.01)
-dial = Button(27, pull_up=True, bounce_time=0.002)  # 2 ms; adjust if needed
+hook = Button(13, pull_up=True, bounce_time=0.01)
+dial = Button(20, pull_up=True, bounce_time=0.002)  # 2 ms; adjust if needed
 
 digit = 0
 flush_timer = None
@@ -34,7 +34,6 @@ def on_pulse():
     digit += 1
     schedule_flush()
 
-# Nice UX: print hook state and make sure any partial digit is flushed on hang-up
 def on_hook_down():
     flush()
     print("Handset ON cradle")
@@ -43,8 +42,8 @@ def on_hook_up():
     print("Handset LIFTED")
 
 dial.when_released = on_pulse
-hook.when_pressed  = on_hook_down     # switch closed to GND
-hook.when_released = on_hook_up       # switch open (pulled up)
+hook.when_pressed  = on_hook_up     # switch closed to GND
+hook.when_released = on_hook_down       # switch open (pulled up)
 
 print("Dial test v2: lift handset and dial. Ctrl+C to quit.")
 pause()
