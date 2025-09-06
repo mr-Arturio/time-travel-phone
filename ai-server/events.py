@@ -1,4 +1,3 @@
-cat > ai-server/events.py <<'PY'
 import asyncio, json, uuid
 from collections import deque
 from datetime import datetime, timezone
@@ -85,4 +84,3 @@ class ClientEvent(BaseModel):
 async def post_event(ev: ClientEvent):
     event_bus.emit(ev.type, ev.text or "", ev.call_id, **(ev.data or {}))
     return {"ok": True}
-PY
