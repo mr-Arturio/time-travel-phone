@@ -1,32 +1,60 @@
 (async function () {
-  // 1) Load /health once for status
-  try {
-    const r = await fetch("/health");
-    const h = await r.json();
-    document.getElementById("llmEp").textContent = h.llm_endpoint || "—";
-    document.getElementById("llmModel").textContent = h.llm_model || "—";
-    document.getElementById("whisperModel").textContent =
-      h.whisper_model || "—";
-    document.getElementById("piperBin").textContent = h.piper_bin || "—";
+  const $ = (id) => document.getElementById(id);
 
-    const llmBadge = document.getElementById("llmBadge");
-    llmBadge.textContent = "LLM: " + (h.llm_ok ? "ready" : "down");
-    llmBadge.classList.toggle("ok", !!h.llm_ok);
-    llmBadge.classList.toggle("bad", !h.llm_ok);
+  // --- Health badge updater ---
+  async function refreshHealth() {
+    try {
+      const r = await fetch("/health", { cache: "no-store" });
+      const h = await r.json();
 
-    const sttBadge = document.getElementById("sttBadge");
-    sttBadge.textContent = "Whisper: " + (h.device || "—");
-    sttBadge.classList.add("ok");
-  } catch (e) {
-    const llmBadge = document.getElementById("llmBadge");
-    llmBadge.textContent = "LLM: error";
-    llmBadge.classList.add("bad");
+      $("#llmEp").textContent = h.llm_endpoint || "—";
+      $("#llmModel").textContent = h.llm_model || "—";
+      $("#whisperModel").textContent = h.whisper_model || "—";
+      $("#piperBin").textContent = h.piper_bin || "—";
+
+      const llmBadge = $("#llmBadge");
+      llmBadge.textContent = "LLM: " + (h.llm_ok ? "ready" : "down");
+      llmBadge.classList.toggle("ok", !!h.llm_ok);
+      llmBadge.classList.toggle("bad", !h.llm_ok);
+
+      const sttBadge = $("#sttBadge");
+      sttBadge.textContent = "Whisper: " + (h.device || "—");
+      sttBadge.classList.add("ok"); // device string already indicates CPU/GPU
+    } catch (e) {
+      const llmBadge = $("#llmBadge");
+      llmBadge.textContent = "LLM: error";
+      llmBadge.classList.remove("ok");
+      llmBadge.classList.add("bad");
+      // optional: console.error(e);
+    }
   }
+  await refreshHealth();
+  setInterval(refreshHealth, 4000);
 
-  // 2) SSE events
-  const list = document.getElementById("events");
+  // --- Event rendering ---
+  const list = $("#events");
+  function chip(k, v) {
+    return `<span class="chip"><b>${k}</b> ${v}</span>`;
+  }
   function add(ev) {
     const d = ev.data || {};
+    const ms = d.ms || {};
+    const persona = d.persona ? ` <span class="chip">${d.persona}</span>` : "";
+    const timing = Object.keys(ms).length
+      ? `<div class="timing">${[
+          "stt" in ms ? chip("stt", ms.stt) : "",
+          "llm" in ms ? chip("llm", ms.llm) : "",
+          "tts" in ms ? chip("tts", ms.tts) : "",
+          "total" in ms ? chip("total", ms.total) : "",
+        ]
+          .filter(Boolean)
+          .join("")}</div>`
+      : "";
+
+    const transcript = d.transcript
+      ? `<div class="soft">🗣 <em>${d.transcript}</em></div>`
+      : "";
+
     const el = document.createElement("div");
     el.className = "ev";
     el.innerHTML = `
@@ -39,31 +67,35 @@
             ? `<span>•</span><code>${ev.call_id.slice(0, 8)}</code>`
             : ""
         }
+        ${persona}
       </div>
       <div class="body">
         ${ev.text ? ev.text : ""}
-        ${
-          d.ms
-            ? `<div style="margin-top:4px;color:#9cb3c9;">⏱ ms: ${JSON.stringify(
-                d.ms
-              )}</div>`
-            : ""
-        }
-        ${
-          d.transcript
-            ? `<div style="margin-top:4px;">🗣 <em>${d.transcript}</em></div>`
-            : ""
-        }
+        ${transcript}
+        ${timing}
       </div>`;
     list.prepend(el);
   }
 
+  // --- SSE wiring ---
   const es = new EventSource("/events");
+
+  // Listen to our named event types (emitted by the server)
+  ["phone_start", "stt_start", "stt_done", "call_end"].forEach((t) => {
+    es.addEventListener(t, (e) => {
+      try {
+        add(JSON.parse(e.data));
+      } catch {}
+    });
+  });
+
+  // Fallback for any other event types
   es.onmessage = (m) => {
     try {
       add(JSON.parse(m.data));
     } catch {}
   };
+
   es.addEventListener("open", () =>
     add({
       type: "client",
@@ -71,6 +103,7 @@
       text: "🔌 connected to /events",
     })
   );
+
   es.addEventListener("error", () =>
     add({
       type: "client",
@@ -78,4 +111,7 @@
       text: "⚠️ event stream error",
     })
   );
+
+  // Clean up on navigation
+  window.addEventListener("beforeunload", () => es.close());
 })();
