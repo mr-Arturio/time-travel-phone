@@ -2,23 +2,41 @@ Run:
 
 ## Fresh Pod:
 ```
-Connect to your pod using SSH
+# Pod shell
 git clone https://github.com/mr-Arturio/time-travel-phone.git
 cd time-travel-phone/ai-server
-chmod +x install-piper.sh
-./install-piper.sh           # one-time Piper build + voice
-chmod +x install-llm.sh         # one-time vLLM install into venv
-chmod +x run.sh
-./run.sh                     # one-time deps + sanity (or just: pip install -r requirements.txt)
+
+chmod +x install-piper.sh install-llm.sh env.auto.sh start_vllm.sh start_api.sh run.sh
+
+# One-time installs
+./install-piper.sh
+./install-llm.sh
+
+# Start vLLM (8011) – uses env.auto.sh internally
+./start_vllm.sh
+
+# Verify vLLM is up
+curl -s http://127.0.0.1:8011/v1/models | head -c 200; echo
+
+# First time only: set up venv + deps
+./run.sh    # (creates venv, installs requirements, then starts API on :8000)
+# ^ If you prefer keeping run.sh only for installs, Ctrl+C and then:
+# ./start_api.sh   # start API with env.auto.sh sourced
+                 
 ```
 Open tunnel in a new tab:
-ssh -i $env:USERPROFILE\.ssh\id_ed25519 -p 40661 -L 8000:127.0.0.1:8000 root@213.173.107.140
+ssh -i $env:USERPROFILE\.ssh\id_ed25519 `
+    -p <podPort> `
+    -L 8000:127.0.0.1:8000 `
+    -L 8011:127.0.0.1:8011 `
+    root@<podIP>
 
+curl http://localhost:8011/v1/models
 curl http://localhost:8000/health
 
 On laptop tab: 
 
-Check and update the poPort - $podPort in start-time-travel.ps1
+Check and update the podPort - $podPort in start-time-travel.ps1
 powershell -ExecutionPolicy Bypass -File .\start-time-travel.ps1
 
 
