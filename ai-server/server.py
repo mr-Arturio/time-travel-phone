@@ -7,6 +7,7 @@ import numpy as np, soundfile as sf
 from faster_whisper import WhisperModel
 import uuid
 from events import sse_router, event_router, event_bus
+from fastapi.staticfiles import StaticFiles
 
 
 
@@ -19,6 +20,9 @@ except Exception:
 app = FastAPI()
 app.include_router(sse_router)
 app.include_router(event_router)
+# Dashboard
+UI_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "ui-dashboard"))
+app.mount("/ui", StaticFiles(directory=UI_DIR, html=True), name="ui")
 
 # ---------- Config / Env ----------
 WHISPER_MODEL  = os.environ.get("WHISPER_MODEL", "small.en")
@@ -164,6 +168,11 @@ def _push_metric(m: dict) -> None:
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
+    #  redirect "/" to the dashboard
+@app.get("/", include_in_schema=False)
+def root():
+    return RedirectResponse(url="/ui/")
+
 # ---------- Health ----------
 @app.get("/health")
 def health():
@@ -262,6 +271,7 @@ async def converse(persona: str = Form(...), audio: UploadFile = Form(...)):
     used_llm = False
     reply_text = ""
     if transcript:
+        event_bus.emit("llm_start", "Generating…", call_id)    
         if llm_backends and llm_backends.health():
             try:
                 reply_text = llm_backends.chat(system_prompt, transcript)
@@ -273,8 +283,11 @@ async def converse(persona: str = Form(...), audio: UploadFile = Form(...)):
     else:
         reply_text = f"{persona_info.get('name', persona)} is listening."
     t_llm = time.time() - t1
+    event_bus.emit("llm_done", "LLM reply", call_id,                     
+               ms=int(t_llm * 1000), used=used_llm, reply=reply_text[:500])
 
     # 5) TTS
+    event_bus.emit("tts_start", "Speaking…", call_id) 
     t2 = time.time()
     try:
         audio_bytes = piper_tts_multi(reply_text, voice_path, voice_json, target_sr=None, pause_ms=120)
@@ -286,6 +299,8 @@ async def converse(persona: str = Form(...), audio: UploadFile = Form(...)):
         sf.write(buf, y, sr, format="WAV", subtype="PCM_16")
         buf.seek(0)
     t_tts = time.time() - t2
+    event_bus.emit("tts_done", "TTS done", call_id,
+                   ms=int(t_tts * 1000), audio=buf)
 
     # 6) metrics
     METRICS.append({

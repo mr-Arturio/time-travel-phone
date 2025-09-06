@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Time-Travel Phone — Live Dashboard</title>
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <header>
+      <div class="title">☎️ Time-Travel Phone — Live Dashboard</div>
+      <div id="llmBadge" class="badge">LLM: checking…</div>
+      <div id="sttBadge" class="badge">Whisper: …</div>
+    </header>
+
+    <main>
+      <section>
+        <h2>Status</h2>
+        <div id="status">
+          <div class="row"><span>Endpoint</span><code id="llmEp">—</code></div>
+          <div class="row"><span>Model</span><code id="llmModel">—</code></div>
+          <div class="row">
+            <span>Whisper</span><code id="whisperModel">—</code>
+          </div>
+          <div class="row"><span>Piper</span><code id="piperBin">—</code></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Live events</h2>
+        <div id="events"></div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
