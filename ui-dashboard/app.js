@@ -1,117 +1,81 @@
-(async function () {
-  const $ = (id) => document.getElementById(id);
+// ui/app.js
+(function () {
+  const log = (...a) => console.log("[ui]", ...a);
 
-  // --- Health badge updater ---
+  const $ = (id) => document.getElementById(id);
+  const setText = (id, txt) => {
+    const el = $(id);
+    if (el) el.textContent = txt;
+  };
+  const setBadge = (id, label, ok) => {
+    const el = $(id);
+    if (!el) return;
+    el.textContent = label;
+    el.classList.toggle("ok", !!ok);
+    el.classList.toggle("bad", !ok);
+  };
+
   async function refreshHealth() {
     try {
       const r = await fetch("/health", { cache: "no-store" });
       const h = await r.json();
-
-      $("#llmEp").textContent = h.llm_endpoint || "—";
-      $("#llmModel").textContent = h.llm_model || "—";
-      $("#whisperModel").textContent = h.whisper_model || "—";
-      $("#piperBin").textContent = h.piper_bin || "—";
-
-      const llmBadge = $("#llmBadge");
-      llmBadge.textContent = "LLM: " + (h.llm_ok ? "ready" : "down");
-      llmBadge.classList.toggle("ok", !!h.llm_ok);
-      llmBadge.classList.toggle("bad", !h.llm_ok);
-
-      const sttBadge = $("#sttBadge");
-      sttBadge.textContent = "Whisper: " + (h.device || "—");
-      sttBadge.classList.add("ok"); // device string already indicates CPU/GPU
+      setText("llmEp", h.llm_endpoint || "—");
+      setText("llmModel", h.llm_model || "—");
+      setText("whisperModel", h.whisper_model || "—");
+      setText("piperBin", h.piper_bin || "—");
+      setBadge("llmBadge", "LLM: " + (h.llm_ok ? "ready" : "down"), h.llm_ok);
+      setBadge("sttBadge", "Whisper: " + (h.device || "—"), true);
     } catch (e) {
-      const llmBadge = $("#llmBadge");
-      llmBadge.textContent = "LLM: error";
-      llmBadge.classList.remove("ok");
-      llmBadge.classList.add("bad");
-      // optional: console.error(e);
+      setBadge("llmBadge", "LLM: error", false);
+      log("health error", e);
     }
   }
-  await refreshHealth();
-  setInterval(refreshHealth, 4000);
 
-  // --- Event rendering ---
-  const list = $("#events");
-  function chip(k, v) {
-    return `<span class="chip"><b>${k}</b> ${v}</span>`;
-  }
   function add(ev) {
+    const list = $("events");
+    if (!list) return;
     const d = ev.data || {};
-    const ms = d.ms || {};
-    const persona = d.persona ? ` <span class="chip">${d.persona}</span>` : "";
-    const timing = Object.keys(ms).length
-      ? `<div class="timing">${[
-          "stt" in ms ? chip("stt", ms.stt) : "",
-          "llm" in ms ? chip("llm", ms.llm) : "",
-          "tts" in ms ? chip("tts", ms.tts) : "",
-          "total" in ms ? chip("total", ms.total) : "",
-        ]
-          .filter(Boolean)
-          .join("")}</div>`
-      : "";
-
-    const transcript = d.transcript
-      ? `<div class="soft">🗣 <em>${d.transcript}</em></div>`
-      : "";
-
     const el = document.createElement("div");
     el.className = "ev";
+    const ts = ev.ts ? new Date(ev.ts).toLocaleTimeString() : "";
     el.innerHTML = `
       <div class="head">
         <span class="type">${ev.type}</span>
-        <span>•</span>
-        <span>${new Date(ev.ts).toLocaleTimeString()}</span>
-        ${
-          ev.call_id
-            ? `<span>•</span><code>${ev.call_id.slice(0, 8)}</code>`
-            : ""
-        }
-        ${persona}
+        <span>•</span><span>${ts}</span>
+        ${ev.call_id ? `<span>•</span><code>${ev.call_id.slice(0, 8)}</code>` : ""}
       </div>
       <div class="body">
         ${ev.text ? ev.text : ""}
-        ${transcript}
-        ${timing}
+        ${d.ms ? `<div style="margin-top:4px;color:#9cb3c9;">⏱ ms: ${JSON.stringify(d.ms)}</div>` : ""}
+        ${d.transcript ? `<div style="margin-top:4px;">🗣 <em>${d.transcript}</em></div>` : ""}
       </div>`;
     list.prepend(el);
   }
 
-  // --- SSE wiring ---
-  const es = new EventSource("/events");
+  function startSSE() {
+    const es = new EventSource("/events");
+    es.onmessage = (m) => {
+      try { add(JSON.parse(m.data)); }
+      catch (e) { log("SSE parse error", e, m.data); }
+    };
+    es.addEventListener("open", () =>
+      add({ type: "client", ts: new Date().toISOString(), text: "🔌 connected to /events" })
+    );
+    es.addEventListener("error", () =>
+      add({ type: "client", ts: new Date().toISOString(), text: "⚠️ event stream error" })
+    );
+    window.addEventListener("beforeunload", () => es.close());
+  }
 
-  // Listen to our named event types (emitted by the server)
-  ["phone_start", "stt_start", "stt_done", "call_end"].forEach((t) => {
-    es.addEventListener(t, (e) => {
-      try {
-        add(JSON.parse(e.data));
-      } catch {}
-    });
-  });
+  // kick it off
+  refreshHealth();
+  setInterval(refreshHealth, 5000);
+  startSSE();
 
-  // Fallback for any other event types
-  es.onmessage = (m) => {
-    try {
-      add(JSON.parse(m.data));
-    } catch {}
-  };
-
-  es.addEventListener("open", () =>
-    add({
-      type: "client",
-      ts: new Date().toISOString(),
-      text: "🔌 connected to /events",
-    })
-  );
-
-  es.addEventListener("error", () =>
-    add({
-      type: "client",
-      ts: new Date().toISOString(),
-      text: "⚠️ event stream error",
-    })
-  );
-
-  // Clean up on navigation
-  window.addEventListener("beforeunload", () => es.close());
+  // optional: log that the dashboard opened (exercise the /event POST)
+  fetch("/event", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ type: "dashboard_open", text: "UI opened" }),
+  }).catch(() => {});
 })();
