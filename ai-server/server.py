@@ -211,7 +211,7 @@ def metrics():
 
 
 # ---------- Main endpoint ----------
-@@app.post("/converse")
+@app.post("/converse")
 async def converse(persona: str = Form(...), audio: UploadFile = Form(...)):
     t_all0 = time.time()
     persona_info = _persona_lookup(persona)
