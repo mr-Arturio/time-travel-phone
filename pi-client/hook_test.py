@@ -1,20 +1,20 @@
+#!/usr/bin/env python3
 from gpiozero import Button
 from signal import pause
 
-# Your wiring: White -> GND, Black -> (1kΩ) -> GPIO13, plus 0.1uF from GPIO13->GND
-# Note: Debounce bumped to 50 ms to tame mechanical chatter.
-hook = Button(13, pull_up=True, bounce_time=0.05)
+# HOOK on GPIO13 (your wiring). F->GND, L1->(1k)->GPIO13, +0.1uF GPIO13->GND
+hook = Button(13, pull_up=True, bounce_time=0.01)
 
-def handset_on_cradle():
-    print("Handset ON cradle")     # switch closed to GND
+def on_down():
+    print("Handset ON cradle")
 
-def handset_lifted():
-    print("Handset LIFTED")        # switch open (pulled up)
+def on_up():
+    print("Handset LIFTED")
 
-# Because the wiring is inverted, pressed == LIFTED and released == ON CRADLE
-hook.when_pressed  = handset_lifted
-hook.when_released = handset_on_cradle
+# If messages look reversed for your contact pair, just swap these two lines:
+hook.when_pressed  = on_down     # pressed = closed to GND (on cradle)
+hook.when_released = on_up       # released = open (lifted)
 
-print("Hook test running... Lift and replace the handset. Press Ctrl+C to quit.")
-print("Initial state:", "Handset LIFTED" if hook.is_pressed else "Handset ON cradle")
+print("Hook test running... Lift/hang a few times. Ctrl+C to quit.")
 pause()
+
