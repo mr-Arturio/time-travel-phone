@@ -1,7 +1,11 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
     <title>Time-Travel Phone — Live Dashboard</title>
     <link rel="stylesheet" href="app.css" />
   </head>
@@ -26,8 +30,15 @@
       </section>
 
       <section>
-        <h2>Live events</h2>
-        <div id="events"></div>
+        <h2>Live calls</h2>
+        <div id="events">
+          <!-- Placeholder until the first event arrives -->
+          <div id="empty" class="ev">
+            <div class="body">
+              No calls yet. Trigger one from the tiny client…
+            </div>
+          </div>
+        </div>
       </section>
     </main>
 

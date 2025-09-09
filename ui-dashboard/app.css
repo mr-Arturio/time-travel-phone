@@ -96,3 +96,70 @@ code {
   border: 1px solid #16202b;
   color: #bfe1ff;
 }
+.call {
+  background: #0b1220;
+  border: 1px solid #1b2a44;
+  border-radius: 10px;
+  margin: 10px 0;
+}
+.call-h,
+.call-b {
+  padding: 10px 12px;
+}
+.call-h {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid #1b2a44;
+}
+.call-h .left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.call .badge {
+  background: #183153;
+  color: #cbe2ff;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.call-h .right {
+  display: flex;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+  color: #9cb3c9;
+}
+.call-h .right .strong {
+  color: #cbe2ff;
+}
+.call-b .row {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+.call-b .row .label {
+  width: 90px;
+  color: #9cb3c9;
+}
+.call-b .row .value {
+  flex: 1;
+  white-space: pre-wrap;
+}
+.small {
+  font-size: 12px;
+}
+.gray {
+  color: #8aa1b8;
+}
+@media (max-width: 900px) {
+  main {
+    grid-template-columns: 1fr;
+  }
+}
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
