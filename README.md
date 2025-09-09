@@ -52,7 +52,22 @@ bash env.auto.sh             # sets caches/TMP to /workspace (or $HOME)
 
 ```
 
+## To start the Pi
+```
+ssh <username>@<hostname> - 
+  or
+ssh <username>t@<Pi IP Address> 
+```
+ - enter your password
 
+ ```
+sudo apt update
+sudo apt install -y sox libsox-fmt-all curl jq
+# Quick check
+sox --version
+curl --version
+
+ ```
 
 ## For the Hook
 Do this (Pi power OFF):

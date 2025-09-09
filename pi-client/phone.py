@@ -5,11 +5,11 @@ from gpiozero import Button
 # ====== CONFIG ======
 HOOK_GPIO = 13
 DIAL_GPIO = 20
-USB_DEV   = "plughw:CARD=Audio,DEV=0" 
+USB_DEV   = "plughw:CARD=Audio,DEV=0"   # your MOSWAG (change if needed)
 SOUNDS    = os.path.expanduser("~/timephone/sounds")
 SERVER    = os.environ.get("CONVERSE_URL", "http://127.0.0.1:8000/converse")
 # Map 3-digit codes to persona names your server expects
-PERSONAS  = {"314":"einstein", "186":"lincoln", "168":"newton"}
+PERSONAS  = {"314":"einstein", "186":"lincoln", "168":"newton"}  # example
 INTER_DIGIT_GAP = 0.7      # s of silence between digits
 MAX_RECORD_SEC  = 30       # safety cap if no silence
 # ====================
