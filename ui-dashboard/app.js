@@ -2,7 +2,8 @@
 (function () {
   const $ = (sel) => document.querySelector(sel);
   const list = $("#events");
-  const calls = new Map(); // call_id -> {root, header, body, times}
+  const calls = new Map(); // call_id -> {root, header, body, times, persona, digits}
+  let activeId = null; // temporary card id before server assigns a call_id
 
   function prettyMs(ms) {
     if (ms == null) return "—";
@@ -19,7 +20,7 @@
     header.innerHTML = `
       <div class="left">
         <span class="badge">CALL</span>
-        <code class="cid">${call_id.slice(0, 8)}</code>
+        <code class="cid">${String(call_id).slice(0, 8)}</code>
         <span class="persona"></span>
       </div>
       <div class="right">
@@ -54,43 +55,70 @@
       root,
       header,
       body,
+      persona: persona || "unknown",
+      digits: "",
       times: { stt: null, llm: null, tts: null, total: null },
       setPersona(name) {
-        header.querySelector(".persona").textContent = `• ${name}`;
+        this.persona = name || "unknown";
+        header.querySelector(".persona").textContent = `• ${this.persona}${
+          this.digits ? "  #" + this.digits : ""
+        }`;
+      },
+      addDigit(d) {
+        this.digits += String(d);
+        header.querySelector(
+          ".persona"
+        ).textContent = `• ${this.persona}  #${this.digits}`;
       },
       setTranscript(text, ms) {
         body.querySelector(".transcript").textContent = text || "";
         this.times.stt = ms ?? this.times.stt;
-        header.querySelector(".stt").textContent = `STT: ${prettyMs(this.times.stt)}`;
+        header.querySelector(".stt").textContent = `STT: ${prettyMs(
+          this.times.stt
+        )}`;
       },
       setReply(text, used, ms) {
         body.querySelector(".reply").textContent = text || "";
         this.times.llm = ms ?? this.times.llm;
-        header.querySelector(".llm").textContent = `LLM: ${prettyMs(this.times.llm)}${used ? "" : " (fallback)"}`;
+        header.querySelector(".llm").textContent = `LLM: ${prettyMs(
+          this.times.llm
+        )}${used ? "" : " (fallback)"}`;
       },
       setTTS(ms) {
         this.times.tts = ms ?? this.times.tts;
-        header.querySelector(".tts").textContent = `TTS: ${prettyMs(this.times.tts)}`;
+        header.querySelector(".tts").textContent = `TTS: ${prettyMs(
+          this.times.tts
+        )}`;
       },
       setTotal(ms) {
         this.times.total = ms ?? this.times.total;
-        header.querySelector(".total").textContent = `Total: ${prettyMs(this.times.total)}`;
+        header.querySelector(".total").textContent = `Total: ${prettyMs(
+          this.times.total
+        )}`;
       },
       note(text) {
         body.querySelector(".note").textContent = text || "";
       },
     };
 
+    obj.setPersona(persona);
     calls.set(call_id, obj);
     return obj;
   }
 
   function ensureCard(call_id, personaMaybe) {
-    if (!call_id) return null; // ignore test/dashboard events
+    if (!call_id) return null;
     if (!calls.has(call_id)) {
       return makeCallCard(call_id, personaMaybe || "unknown");
     }
     return calls.get(call_id);
+  }
+
+  // Fallback: keep a temporary active card when no call_id is present yet
+  function ensureActiveCard(ev, personaMaybe) {
+    const cid = ev.call_id || activeId || `pending-${Date.now()}`;
+    if (!activeId) activeId = cid; // lock until end of call
+    return ensureCard(cid, personaMaybe);
   }
 
   // 1) Load /health once for status bar
@@ -112,11 +140,15 @@
       sttBadge.textContent = "Whisper: " + (h.device || "—");
       sttBadge.classList.add("ok");
 
-      // Mark UI opened (for your curl window / history)
+      // Mark UI opened (tolerate either 'type' or 'event' on server)
       fetch("/event", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ type: "dashboard_open", text: "UI opened" }),
+        body: JSON.stringify({
+          type: "dashboard_open",
+          event: "dashboard_open",
+          text: "UI opened",
+        }),
       }).catch(() => {});
     } catch {
       const llmBadge = $("#llmBadge");
@@ -126,25 +158,55 @@
   })();
 
   // 2) Handle incoming events
-  function handle(ev) {
+  function handle(raw) {
+    // Support either 'type' or 'event' field names from the server
+    const type = raw.type || raw.event || "message";
+    const data = raw.data || {};
+    const ts = raw.ts || Date.now();
+
     // Remove placeholder if present
     const empty = document.getElementById("empty");
     if (empty) empty.remove();
 
-    const data = ev.data || {};
-    switch (ev.type) {
+    switch (type) {
       case "phone_start": {
-        const card = ensureCard(ev.call_id, data.persona);
-        if (card) card.setPersona(data.persona || "unknown");
+        const card = ensureActiveCard(raw, data.persona);
+        if (card) {
+          card.setPersona(data.persona || "unknown");
+          card.note("Handset lifted — dial a 3-digit code…");
+        }
+        break;
+      }
+      case "dial_digit": {
+        const card = ensureActiveCard(raw);
+        if (card) {
+          if (typeof data.d !== "undefined") card.addDigit(data.d);
+          card.note(`Dialing… ${card.digits}`);
+        }
+        break;
+      }
+      case "ringback": {
+        const card = ensureActiveCard(raw);
+        if (card) card.note("Ringback…");
+        break;
+      }
+      case "record_start": {
+        const card = ensureActiveCard(raw);
+        if (card) card.note("Recording… speak now.");
+        break;
+      }
+      case "record_done": {
+        const card = ensureActiveCard(raw);
+        if (card) card.note(`Recorded ${data.sec ?? "?"}s — transcribing…`);
         break;
       }
       case "stt_start": {
-        const card = ensureCard(ev.call_id);
+        const card = ensureActiveCard(raw);
         if (card) card.note("Transcribing…");
         break;
       }
       case "stt_done": {
-        const card = ensureCard(ev.call_id);
+        const card = ensureActiveCard(raw);
         if (card) {
           card.setTranscript(data.transcript || "", data.ms);
           card.note("");
@@ -152,12 +214,12 @@
         break;
       }
       case "llm_start": {
-        const card = ensureCard(ev.call_id);
+        const card = ensureActiveCard(raw);
         if (card) card.note("Generating…");
         break;
       }
       case "llm_done": {
-        const card = ensureCard(ev.call_id);
+        const card = ensureActiveCard(raw);
         if (card) {
           card.setReply(data.reply || "", !!data.used, data.ms);
           card.note("");
@@ -165,12 +227,12 @@
         break;
       }
       case "tts_start": {
-        const card = ensureCard(ev.call_id);
+        const card = ensureActiveCard(raw);
         if (card) card.note("Speaking…");
         break;
       }
       case "tts_done": {
-        const card = ensureCard(ev.call_id);
+        const card = ensureActiveCard(raw);
         if (card) {
           card.setTTS(data.ms);
           card.note("");
@@ -178,24 +240,26 @@
         break;
       }
       case "call_end": {
-        const card = ensureCard(ev.call_id);
+        const card = ensureActiveCard(raw);
         if (card) {
           card.setTotal(data.total_ms);
-          card.note("Completed");
+          card.note(data.reason ? `Completed (${data.reason})` : "Completed");
         }
+        // clear activeId so the next call makes a new card
+        activeId = null;
         break;
       }
       default: {
-        // For test/dashboard events, just log a small line at the top
+        // For test/dashboard events or unknown types, just log a small line at the top
         const el = document.createElement("div");
         el.className = "ev";
         el.innerHTML = `
           <div class="head">
-            <span class="type">${ev.type}</span>
+            <span class="type">${type}</span>
             <span>•</span>
-            <span>${new Date(ev.ts).toLocaleTimeString()}</span>
+            <span>${new Date(ts).toLocaleTimeString()}</span>
           </div>
-          <div class="body">${ev.text || ""}</div>`;
+          <div class="body">${raw.text || ""}</div>`;
         list.prepend(el);
       }
     }
@@ -205,6 +269,10 @@
   const es = new EventSource("/events");
   const TYPES = [
     "phone_start",
+    "dial_digit",
+    "ringback",
+    "record_start",
+    "record_done",
     "stt_start",
     "stt_done",
     "llm_start",

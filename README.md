@@ -1,3 +1,17 @@
+
+Architecture
+Raspberry Pi 4 installed in the old rotarry phone
+
+Speech‑to‑Text: faster‑whisper (CPU by default; leverages CUDA when present)
+
+LLM: vLLM serving openai/gpt-oss-20b (OpenAI API shim)
+
+Text‑to‑Speech: Piper ONNX voice en_US-amy-low.onnx
+
+API: FastAPI routes for /converse, /health, /events; personas via personas.json
+
+Dashboard: /ui static page consuming SSE events to visualize call lifecycle
+
 Run:
 
 ## Fresh Pod:
@@ -25,11 +39,12 @@ curl -s http://127.0.0.1:8011/v1/models | head -c 200; echo
                  
 ```
 Open tunnel in a new tab:
-ssh -i $env:USERPROFILE\.ssh\id_ed25519 `
+ssh -vv -N -g -i $env:USERPROFILE\.ssh\id_ed25519`
     -p <podPort> `
-    -L 8000:127.0.0.1:8000 `
-    -L 8011:127.0.0.1:8011 `
+    -L 0.0.0.0:8000:127.0.0.1:8000`
     root@<podIP>
+
+Exposes your pod’s API :8000 on your laptop for the Pi to use.
 
 curl http://localhost:8011/v1/models
 curl http://localhost:8000/health
@@ -54,11 +69,12 @@ bash env.auto.sh             # sets caches/TMP to /workspace (or $HOME)
 
 ## To start the Pi
 ```
-ssh <username>@<hostname> - 
+ssh <username>@<hostname>  # ssh mrart@timephone
   or
-ssh <username>t@<Pi IP Address> 
+ssh <username>t@<Pi IP Address> # ssh mrart@192.168.0.153
 ```
- - enter your password
+ - enter your password   
+  - git clone https://github.com/mr-Arturio/time-travel-phone.git
 
  ```
 sudo apt update
@@ -68,6 +84,18 @@ sox --version
 curl --version
 
  ```
+- do all the audio and hook tests
+
+ ```
+ /projects/time-travel-phone/pi-client $ ./phone.py
+ ```
+ ### From the Pi, verify reachability to your laptop
+curl -s http://<LAPTOP_IP_ON_LAN>:8000/health | jq 
+curl -s http://192.168.0.155:8000/health | jq
+
+export CONVERSE_URL="http://<your-laptop-LAN-IP>:8000/converse" 
+# export CONVERSE_URL="http://192.168.0.155:8000/converse"
+
 
 ## For the Hook
 Do this (Pi power OFF):

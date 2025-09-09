@@ -15,3 +15,7 @@ ai-server/.venv/
 *.onnx
 *.onnx.json
 ai-server/*.log
+pi-client/__pycache__/
+*.swp
+pi-client/question.wav
+pi-client/reply.wav
