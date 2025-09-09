@@ -26,7 +26,7 @@ HANGUP_GRACE    = 0.35         # must be ON cradle continuously for this long to
 # --- helpers for events → dashboard (/event) ---
 def emit(event: str, data: dict | None = None):
     try:
-        requests.post(f"{SERVER_BASE}/event", json={"event": event, "data": data or {}}, timeout=1.5)
+        requests.post(f"{SERVER_BASE}/event", json={"type": event, "data": data or {}}, timeout=1.5)
     except Exception:
         pass
 
