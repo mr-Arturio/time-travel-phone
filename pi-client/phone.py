@@ -37,9 +37,9 @@ def log(msg: str):
 hook = Button(HOOK_GPIO, pull_up=True,  bounce_time=HOOK_BOUNCE)
 dial = Button(DIAL_GPIO,  pull_up=True,  bounce_time=0.002)  # "open" pulses while dial returns
 
-# Interpret hook.is_pressed == ON cradle (closed to GND)
+# >>> CHANGED: interpret hook.is_pressed == LIFTED (your wiring), so ON cradle == not is_pressed
 def hook_on_cradle() -> bool:
-    return hook.is_pressed
+    return not hook.is_pressed
 
 def hung_up_stable(timeout=HANGUP_GRACE) -> bool:
     """Return True only if hook stays ON CRADLE for the entire timeout window."""
@@ -84,7 +84,7 @@ def start_dial_tone():
     stop_playing()
     play_wav(os.path.join(SOUNDS, "dial_tone.wav"), loop=True)
 
-def ringback_for(seconds=4):
+def ringback_for(seconds=8):
     stop_playing()
     emit("ringback", {"sec": seconds})
     end = time.time() + seconds
@@ -207,7 +207,7 @@ def finalize_digit():
         log(f"[CALL] Connecting to {persona} ({code})…")
 
         # Ringback then "answer click"
-        ringback_for(4)
+        ringback_for(8)
         p = play_wav(os.path.join(SOUNDS, "click.wav"))
         if p: p.wait()
         stop_playing()
@@ -243,10 +243,10 @@ def finalize_digit():
         # leave line quiet until next lift/hang cycle
 
 def main():
-    # IMPORTANT: pressed == ON cradle, released == LIFTED
-    hook.when_pressed   = on_hook_down   # on-cradle
-    hook.when_released  = on_hook_up     # lifted
-    dial.when_released  = on_dial_pulse  # count "open" pulses
+    # >>> CHANGED: pressed == LIFTED, released == ON cradle (due to wiring)
+    hook.when_pressed   = on_hook_up      # lifted
+    hook.when_released  = on_hook_down    # on-cradle
+    dial.when_released  = on_dial_pulse   # count "open" pulses
 
     log("TimePhone ready. Lift handset and dial a 3-digit code (e.g., 314). Ctrl+C to quit.")
     try:
