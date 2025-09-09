@@ -1,13 +1,19 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
-# activate venv if present (best-effort)
-source /time-travel-phone/ai-server/.venv/bin/activate || true
+# Always run from this script’s folder
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# install/upgrade vLLM
+# Pick a Python (assumes python3 exists; adjust if needed)
+PY=python3
+command -v "$PY" >/dev/null 2>&1 || { echo "❌ python3 not found"; exit 1; }
+
+# Create venv if missing, then activate
+[ -f .venv/bin/activate ] || "$PY" -m venv .venv
+source .venv/bin/activate
+
+# Install/upgrade vLLM in this venv
+python -m pip install --upgrade pip
 pip install --upgrade vllm
 
-# show how to start vLLM on the port used by your stack (8011)
-echo "✅ vLLM installed. Start with:"
-echo '  python -m vllm.entrypoints.openai.api_server --model "$VLLM_MODEL" --host 127.0.0.1 --port 8011'
-echo '  # Optionally: --tensor-parallel-size 2 (multi-GPU), --max-model-len 8192'
+echo "✅ vLLM installed in $(which python)"

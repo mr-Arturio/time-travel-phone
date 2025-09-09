@@ -1,7 +1,7 @@
 # --- Config ---
 $sshKey     = "$env:USERPROFILE\.ssh\id_ed25519"
-$podIP      = "213.173.107.140"   # update if RunPod gives a new IP
-$podPort    = 40661               # update if RunPod gives a new port
+$podIP      = "38.147.83.13"   # update if RunPod gives a new IP
+$podPort    = 23440               # update if RunPod gives a new port
 $localPort  = 8000
 $remotePort = 8000
 
