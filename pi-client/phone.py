@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, time, subprocess, threading, signal, requests, shlex, random
+import os, time, subprocess, threading, signal, requests, shlex, random, glob
 from threading import Timer
 from gpiozero import Button
 
@@ -7,12 +7,15 @@ from gpiozero import Button
 HOOK_GPIO = 13
 DIAL_GPIO = 20
 USB_DEV   = "plughw:CARD=Audio,DEV=0"
-SOUNDS = os.environ.get(
-    "SOUNDS_DIR",
-    os.path.join(os.path.dirname(__file__), "sounds")
-)
 
-SERVER    = os.environ.get("CONVERSE_URL", "http://127.0.0.1:8000/converse")
+# Sound search roots (in order): SOUNDS_DIR (if set) → ~/timephone/sounds → repo/pi-client/sounds
+REPO_SOUNDS = os.path.join(os.path.dirname(__file__), "sounds")
+RUNTIME_SOUNDS = os.path.expanduser("~/timephone/sounds")
+SOUNDS_ENV = os.environ.get("SOUNDS_DIR")
+SEARCH_DIRS = [os.path.expanduser(SOUNDS_ENV)] if SOUNDS_ENV else []
+SEARCH_DIRS += [RUNTIME_SOUNDS, REPO_SOUNDS]
+
+SERVER = os.environ.get("CONVERSE_URL", "http://127.0.0.1:8000/converse")
 SERVER_BASE = os.environ.get("EVENTS_BASE", None)
 if not SERVER_BASE:
     SERVER_BASE = SERVER.rsplit("/", 1)[0] if SERVER.endswith("/converse") else SERVER
@@ -25,7 +28,7 @@ HOOK_BOUNCE     = 0.15
 HANGUP_GRACE    = 0.35
 # ====================
 
-ARECORD_PAT = f"arecord -q -D {USB_DEV}"
+ARECORD_PAT  = f"arecord -q -D {USB_DEV}"
 SOX_PIPE_PAT = "sox -t wav - -t wav"
 
 def emit(event: str, data: dict | None = None):
@@ -37,10 +40,21 @@ def emit(event: str, data: dict | None = None):
 def log(msg: str):
     print(msg, flush=True)
 
+def find_sound(name: str) -> str | None:
+    """Search in SEARCH_DIRS for 'name'; return full path or None."""
+    for base in SEARCH_DIRS:
+        if not base:
+            continue
+        p = os.path.join(base, name)
+        if os.path.exists(p):
+            return p
+    return None
+
 hook = Button(HOOK_GPIO, pull_up=True,  bounce_time=HOOK_BOUNCE)
 dial = Button(DIAL_GPIO,  pull_up=True,  bounce_time=0.002)
 
 def hook_on_cradle() -> bool:
+    # your wiring: pressed == lifted → ON cradle when not pressed
     return not hook.is_pressed
 
 def hung_up_stable(timeout=HANGUP_GRACE) -> bool:
@@ -85,23 +99,26 @@ def play_wav_for(path, seconds: float):
     return subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid)
 
 def stop_playing():
-    # stop any aplay (and filler) quickly
+    # stop any aplay quickly
     subprocess.call(["pkill", "-f", f"aplay -q -D {USB_DEV}"],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     # also stop any sox→aplay pipeline writer if it’s still around
     subprocess.call(["pkill", "-f", SOX_PIPE_PAT],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-
 def start_dial_tone():
     stop_playing()
-    play_wav(os.path.join(SOUNDS, "dial_tone.wav"), loop=True)
+    path = find_sound("dial_tone.wav")
+    if path:
+        play_wav(path, loop=True)
 
 def ringback_for(seconds=8):
     stop_playing()
     emit("ringback", {"sec": seconds})
-    p = play_wav_for(os.path.join(SOUNDS, "ringback.wav"), seconds)
-    if p: p.wait()
+    path = find_sound("ringback.wav")
+    if path:
+        p = play_wav_for(path, seconds)
+        if p: p.wait()
 
 # ---- helpers: capture cleanup ----
 def kill_stale_capture():
@@ -113,7 +130,6 @@ def kill_stale_capture():
 
 # ---- single-shot "thinking" filler during LLM ----
 filler_proc = None  # type: subprocess.Popen | None
-
 filler_cancel = threading.Event()
 
 def schedule_filler(delay_sec=1.0):
@@ -128,14 +144,23 @@ def schedule_filler(delay_sec=1.0):
 def cancel_filler_schedule():
     filler_cancel.set()
 
+def _collect_fillers():
+    files = []
+    for base in SEARCH_DIRS:
+        if not base:
+            continue
+        files += glob.glob(os.path.join(base, "filler_*.wav"))
+    # de-dup while preserving order
+    seen, uniq = set(), []
+    for f in files:
+        k = os.path.basename(f)
+        if k in seen: continue
+        seen.add(k); uniq.append(f)
+    return uniq
+
 def play_one_filler_once():
     global filler_proc
-    files = [
-        os.path.join(SOUNDS, "filler_1.wav"),
-        os.path.join(SOUNDS, "filler_2.wav"),
-        os.path.join(SOUNDS, "filler_3.wav"),
-    ]
-    files = [f for f in files if os.path.exists(f)]
+    files = _collect_fillers()
     if not files:
         return
     path = random.choice(files)
@@ -144,10 +169,11 @@ def play_one_filler_once():
         "filler_1.wav": "Give me just a moment…",
         "filler_2.wav": "Hmm—let me think…",
         "filler_3.wav": "One second, please…",
+        "filler_4.wav": "Let me check my notes…",
+        "filler_5.wav": "I'll be right back…",
     }
     caption = captions.get(os.path.basename(path), "Thinking…")
     emit("filler_start", {"text": caption})
-
     filler_proc = play_wav_for(path, 2.3)
 
 def stop_filler():
@@ -161,15 +187,12 @@ def stop_filler():
     stop_playing()
     emit("filler_stop", {})
 
-
 # ---- record + converse ----
 def record_until_silence(out_wav):
     """Record mic; stop ~2s after trailing silence, with a hard cap so device always frees."""
     global recording_proc
     stop_playing()
     kill_stale_capture()
-
-    # Hard-cap the arecord side; SoX will stop quicker if you stop speaking
     cmd = (
         f"{ARECORD_PAT} -f S16_LE -c1 -r16000 -d {MAX_RECORD_SEC} | "
         f"sox -t wav - -t wav {out_wav} silence 1 0.2 2% 1 2.0 2%"
@@ -183,24 +206,23 @@ def converse(persona, in_wav, out_wav):
     try:
         log(f"[NET] POST {SERVER}")
         schedule_filler(1.0)
-
         rc = subprocess.call([
             "curl","-s","-X","POST",
             "-F", f"persona={persona}",
             "-F", f"audio=@{in_wav};type=audio/wav",
             SERVER, "-o", out_wav
         ])
- 
         cancel_filler_schedule()
         stop_filler()
-
         if rc != 0 or not os.path.exists(out_wav) or os.path.getsize(out_wav) < 44:
             raise RuntimeError("server failed")
         return True
     except Exception as e:
         log(f"[NET] ERROR posting to server: {e}")
         stop_filler()
-        subprocess.call(["cp", os.path.join(SOUNDS, "click.wav"), out_wav])
+        click = find_sound("click.wav")
+        if click:
+            subprocess.call(["cp", click, out_wav])
         emit("call_end", {"reason": "net_error"})
         return True
 
@@ -242,7 +264,6 @@ def on_hook_down():
     cancel_filler_schedule()
     stop_filler()
     stop_playing()
-    # kill entire record pipeline group if running
     global recording_proc
     if recording_proc:
         try:
@@ -250,7 +271,6 @@ def on_hook_down():
         except Exception:
             pass
         recording_proc = None
-    # also ensure no stragglers hold the device
     kill_stale_capture()
     emit("call_end", {"reason": "hangup"})
     reset_call_state()
@@ -282,20 +302,21 @@ def finalize_digit():
         persona = PERSONAS.get(code, "einstein")
         log(f"[CALL] Connecting to {persona} ({code})…")
 
-        # ringback → click → greeting
+        # ringback → answer foley → greeting
         ringback_for(8)
-        ans = os.path.join(SOUNDS, "receiver_lift.wav")
-        if os.path.exists(ans):
+        ans = find_sound("receiver_lift.wav")
+        if ans:
             emit("answer", {"sound": "receiver_lift"})
             p = play_wav(ans);  p and p.wait()
         else:
             emit("answer", {"sound": "click"})
-            p = play_wav(os.path.join(SOUNDS, "click.wav"));  p and p.wait()
-
+            click = find_sound("click.wav")
+            if click:
+                p = play_wav(click);  p and p.wait()
         stop_playing()
 
-        greet = os.path.join(SOUNDS, "greet_einstein.wav")
-        if os.path.exists(greet):
+        greet = find_sound("greet_einstein.wav")
+        if greet:
             emit("greet", {"text": "Hello—Einstein listening. How may I help you today?"})
             p = play_wav(greet);  p and p.wait()
         else:

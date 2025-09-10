@@ -20,7 +20,7 @@ Run:
 git clone https://github.com/mr-Arturio/time-travel-phone.git
 cd time-travel-phone/ai-server
 
-chmod +x install-piper.sh install-llm.sh env.auto.sh start_vllm.sh start_api.sh run.sh
+chmod +x install-piper.sh install-llm.sh env.auto.sh start_vllm.sh start_api.sh run.sh make_voice_assets.sh
 
 # One-time installs
 ./install-piper.sh
@@ -29,8 +29,7 @@ chmod +x install-piper.sh install-llm.sh env.auto.sh start_vllm.sh start_api.sh 
 # Start vLLM (8011) – uses env.auto.sh internally
 ./start_vllm.sh
 
-# Verify vLLM is up
-curl -s http://127.0.0.1:8011/v1/models | head -c 200; echo
+./make_voice_assets.sh
 
 # First time only: set up venv + deps
 ./run.sh    # (creates venv, installs requirements, then starts API on :8000)
@@ -45,6 +44,7 @@ Exposes your pod’s API :8000 on your laptop for the Pi to use.
 
 curl http://localhost:8011/v1/models
 curl http://localhost:8000/health
+
 
 On laptop tab: 
 
