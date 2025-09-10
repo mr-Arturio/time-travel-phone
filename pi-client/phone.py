@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os, time, subprocess, threading, signal, requests, shlex
 from threading import Timer
 from gpiozero import Button
@@ -20,6 +21,9 @@ MAX_RECORD_SEC  = 30
 HOOK_BOUNCE     = 0.15
 HANGUP_GRACE    = 0.35
 # ====================
+
+ARECORD_PAT = f"arecord -q -D {USB_DEV}"
+SOX_PIPE_PAT = "sox -t wav - -t wav"
 
 def emit(event: str, data: dict | None = None):
     try:
@@ -44,7 +48,7 @@ def hung_up_stable(timeout=HANGUP_GRACE) -> bool:
         time.sleep(0.01)
     return True
 
-# ---- audio helpers ----
+# ---- state ----
 digits_str = ""
 first_pulse_seen = False
 pulse_count = 0
@@ -52,6 +56,7 @@ flush_timer = None
 recording_proc = None
 state_lock = threading.Lock()
 
+# ---- helpers: audio play/stop ----
 def play_wav(path, loop=False):
     args = ["aplay", "-q", "-D", USB_DEV, path]
     if loop:
@@ -77,6 +82,7 @@ def play_wav_for(path, seconds: float):
     return subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid)
 
 def stop_playing():
+    # stop any aplay (and filler) quickly
     subprocess.call(["pkill", "-f", f"aplay -q -D {USB_DEV}"],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -90,12 +96,19 @@ def ringback_for(seconds=8):
     p = play_wav_for(os.path.join(SOUNDS, "ringback.wav"), seconds)
     if p: p.wait()
 
+# ---- helpers: capture cleanup ----
+def kill_stale_capture():
+    """Ensure no previous capture pipeline is holding the device."""
+    subprocess.call(["pkill", "-f", ARECORD_PAT],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.call(["pkill", "-f", SOX_PIPE_PAT],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
 # ---- filler loop during LLM ----
 filler_stop = threading.Event()
 filler_thread = None
 
 def start_filler_loop():
-    """Loop short 'thinking' clips until stopped."""
     global filler_thread
     files = [
         os.path.join(SOUNDS, "filler_1.wav"),
@@ -110,7 +123,7 @@ def start_filler_loop():
     def loop():
         i = 0
         while not filler_stop.is_set():
-            p = play_wav_for(files[i % len(files)], 2.2)  # ~2.2s each
+            p = play_wav_for(files[i % len(files)], 2.2)
             if p: p.wait()
             if filler_stop.is_set():
                 break
@@ -122,15 +135,19 @@ def start_filler_loop():
 
 def stop_filler_loop():
     filler_stop.set()
-    # ensure any aplay piece is stopped promptly
     stop_playing()
 
+# ---- record + converse ----
 def record_until_silence(out_wav):
+    """Record mic; stop ~2s after trailing silence, with a hard cap so device always frees."""
     global recording_proc
     stop_playing()
+    kill_stale_capture()
+
+    # Hard-cap the arecord side; SoX will stop quicker if you stop speaking
     cmd = (
-        f"arecord -q -D {USB_DEV} -f S16_LE -c1 -r16000 | "
-        f"sox -t wav - -t wav {out_wav} silence 1 0.2 2% 1 2.0 2% trim 0 {MAX_RECORD_SEC}"
+        f"{ARECORD_PAT} -f S16_LE -c1 -r16000 -d {MAX_RECORD_SEC} | "
+        f"sox -t wav - -t wav {out_wav} silence 1 0.2 2% 1 2.0 2%"
     )
     recording_proc = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid)
     recording_proc.wait()
@@ -140,7 +157,6 @@ def converse(persona, in_wav, out_wav):
     """POST to FastAPI /converse; save reply to out_wav. Fallback to click if it fails."""
     try:
         log(f"[NET] POST {SERVER}")
-        # start local 'thinking' fillers
         start_filler_loop()
 
         rc = subprocess.call([
@@ -150,7 +166,6 @@ def converse(persona, in_wav, out_wav):
             SERVER, "-o", out_wav
         ])
 
-        # stop fillers as soon as we have the reply
         stop_filler_loop()
 
         if rc != 0 or not os.path.exists(out_wav) or os.path.getsize(out_wav) < 44:
@@ -163,6 +178,7 @@ def converse(persona, in_wav, out_wav):
         emit("call_end", {"reason": "net_error"})
         return True
 
+# ---- digit handling ----
 def cancel_flush_timer():
     global flush_timer
     if flush_timer:
@@ -184,10 +200,12 @@ def reset_call_state():
     first_pulse_seen = False
     pulse_count = 0
 
+# ---- hook & dial callbacks ----
 def on_hook_up():
     log("[HOOK] LIFTED")
     emit("phone_start", {})
     reset_call_state()
+    kill_stale_capture()   # extra safety on lift
     start_dial_tone()
 
 def on_hook_down():
@@ -197,11 +215,16 @@ def on_hook_down():
     log("[HOOK] ON cradle")
     stop_filler_loop()
     stop_playing()
+    # kill entire record pipeline group if running
+    global recording_proc
     if recording_proc:
         try:
             os.killpg(os.getpgid(recording_proc.pid), signal.SIGTERM)
         except Exception:
             pass
+        recording_proc = None
+    # also ensure no stragglers hold the device
+    kill_stale_capture()
     emit("call_end", {"reason": "hangup"})
     reset_call_state()
 
@@ -246,7 +269,7 @@ def finalize_digit():
         # record question
         qwav = os.path.expanduser("~/timephone/question.wav")
         rwav = os.path.expanduser("~/timephone/reply.wav")
-        log("[REC] Ask your question… (stops ~2s after silence)")
+        log("[REC] Ask your question… (auto-stops after silence or hard cap)")
         emit("record_start", {})
         t0 = time.monotonic()
         record_until_silence(qwav)
@@ -257,6 +280,7 @@ def finalize_digit():
             log("[HOOK] Hung up during record; abort.")
             stop_filler_loop()
             stop_playing()
+            kill_stale_capture()
             emit("call_end", {"reason": "hangup_during_record"})
             reset_call_state()
             return
@@ -271,7 +295,21 @@ def finalize_digit():
         stop_playing()
         emit("call_end", {"reason": "ok"})
 
+# ---- graceful shutdown ----
+def _sigterm(*_):
+    try:
+        on_hook_down()
+    finally:
+        os._exit(0)
+
 def main():
+    signal.signal(signal.SIGTERM, _sigterm)
+    signal.signal(signal.SIGINT, _sigterm)
+
+    # cold-start hygiene
+    stop_playing()
+    kill_stale_capture()
+
     hook.when_pressed   = on_hook_up      # lifted
     hook.when_released  = on_hook_down    # on-cradle
     dial.when_released  = on_dial_pulse   # pulses
