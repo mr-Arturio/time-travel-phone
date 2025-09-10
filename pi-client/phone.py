@@ -15,6 +15,8 @@ SOUNDS_ENV = os.environ.get("SOUNDS_DIR")
 SEARCH_DIRS = [os.path.expanduser(SOUNDS_ENV)] if SOUNDS_ENV else []
 SEARCH_DIRS += [RUNTIME_SOUNDS, REPO_SOUNDS]
 
+print(f"[SOUNDS] search order = {SEARCH_DIRS}", flush=True)
+
 SERVER = os.environ.get("CONVERSE_URL", "http://127.0.0.1:8000/converse")
 SERVER_BASE = os.environ.get("EVENTS_BASE", None)
 if not SERVER_BASE:

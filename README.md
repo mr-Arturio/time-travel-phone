@@ -103,7 +103,10 @@ curl -s http://<LAPTOP_IP_ON_LAN>:8000/health | jq
 curl -s http://192.168.0.155:8000/health | jq
 
 export CONVERSE_URL="http://<your-laptop-LAN-IP>:8000/converse" 
-# export CONVERSE_URL="http://192.168.0.155:8000/converse"
+export CONVERSE_URL="http://192.168.0.155:8000/converse"
+export EVENTS_BASE="http://192.168.0.155:8000"
 
+chmod +x ~/projects/time-travel-phone/pi-client/bin/sync_sounds.sh
+./sync_sounds.sh
 
 Dashboard: http://localhost:8000/ui/
