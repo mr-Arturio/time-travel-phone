@@ -1,4 +1,4 @@
-import os, time, subprocess, threading, signal, requests
+import os, time, subprocess, threading, signal, requests, shlex
 from threading import Timer
 from gpiozero import Button
 
@@ -37,7 +37,7 @@ def log(msg: str):
 hook = Button(HOOK_GPIO, pull_up=True,  bounce_time=HOOK_BOUNCE)
 dial = Button(DIAL_GPIO,  pull_up=True,  bounce_time=0.002)  # "open" pulses while dial returns
 
-# >>> CHANGED: interpret hook.is_pressed == LIFTED (your wiring), so ON cradle == not is_pressed
+# interpret hook.is_pressed == LIFTED (your wiring), so ON cradle == not is_pressed
 def hook_on_cradle() -> bool:
     return not hook.is_pressed
 
@@ -54,8 +54,8 @@ def hung_up_stable(timeout=HANGUP_GRACE) -> bool:
 digits_str = ""
 first_pulse_seen = False
 pulse_count = 0
-flush_timer = None               # type: Timer | None
-recording_proc = None            # type: subprocess.Popen | None
+flush_timer = None
+recording_proc = None
 state_lock = threading.Lock()
 
 def play_wav(path, loop=False):
@@ -75,6 +75,15 @@ def play_wav(path, loop=False):
     else:
         return subprocess.Popen(args)
 
+def play_wav_for(path, seconds: float):
+    """Play only 'seconds' of a WAV, regardless of file length (uses sox trim → aplay)."""
+    secs = max(0.1, float(seconds))
+    cmd = (
+        f"sox {shlex.quote(path)} -t wav - trim 0 {secs} | "
+        f"aplay -q -D {USB_DEV} -t wav -"
+    )
+    return subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid)
+
 def stop_playing():
     # Kill any aplay session going to our device
     subprocess.call(["pkill", "-f", f"aplay -q -D {USB_DEV}"],
@@ -84,13 +93,11 @@ def start_dial_tone():
     stop_playing()
     play_wav(os.path.join(SOUNDS, "dial_tone.wav"), loop=True)
 
-def ringback_for(seconds=8):
+def ringback_for(seconds=4):
     stop_playing()
     emit("ringback", {"sec": seconds})
-    end = time.time() + seconds
-    while time.time() < end:
-        p = play_wav(os.path.join(SOUNDS, "ringback.wav"))
-        if p: p.wait()
+    p = play_wav_for(os.path.join(SOUNDS, "ringback.wav"), seconds)
+    if p: p.wait()
 
 def record_until_silence(out_wav):
     """Record mic and stop ~2s after silence using sox. Aborted by on_hook_down() killing the pgid."""
@@ -119,7 +126,7 @@ def converse(persona, in_wav, out_wav):
         emit("stt_done", {})
         if rc != 0 or not os.path.exists(out_wav) or os.path.getsize(out_wav) < 44:
             raise RuntimeError("server failed")
-        # Mirror the server-side phases so the dashboard looks lively
+        # local UI fills; server will also emit its own phases
         emit("llm_start", {})
         emit("llm_done", {})
         emit("tts_start", {})
@@ -207,10 +214,18 @@ def finalize_digit():
         log(f"[CALL] Connecting to {persona} ({code})…")
 
         # Ringback then "answer click"
-        ringback_for(8)
+        ringback_for(4)
         p = play_wav(os.path.join(SOUNDS, "click.wav"))
         if p: p.wait()
         stop_playing()
+
+        # Einstein greeting (plays before recording)
+        greet = os.path.join(SOUNDS, "greet_einstein.wav")
+        if os.path.exists(greet):
+            p = play_wav(greet)
+            if p: p.wait()
+        else:
+            log("[GREET] greet_einstein.wav not found; skipping.")
 
         # Record the question until ~2s of silence
         qwav = os.path.expanduser("~/timephone/question.wav")
@@ -243,7 +258,7 @@ def finalize_digit():
         # leave line quiet until next lift/hang cycle
 
 def main():
-    # >>> CHANGED: pressed == LIFTED, released == ON cradle (due to wiring)
+    # pressed == LIFTED, released == ON cradle (due to wiring)
     hook.when_pressed   = on_hook_up      # lifted
     hook.when_released  = on_hook_down    # on-cradle
     dial.when_released  = on_dial_pulse   # count "open" pulses
