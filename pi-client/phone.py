@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, time, subprocess, threading, signal, requests, shlex
+import os, time, subprocess, threading, signal, requests, shlex, random
 from threading import Timer
 from gpiozero import Button
 
@@ -85,6 +85,10 @@ def stop_playing():
     # stop any aplay (and filler) quickly
     subprocess.call(["pkill", "-f", f"aplay -q -D {USB_DEV}"],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # also stop any sox→aplay pipeline writer if it’s still around
+    subprocess.call(["pkill", "-f", SOX_PIPE_PAT],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
 
 def start_dial_tone():
     stop_playing()
@@ -104,12 +108,12 @@ def kill_stale_capture():
     subprocess.call(["pkill", "-f", SOX_PIPE_PAT],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-# ---- filler loop during LLM ----
-filler_stop = threading.Event()
-filler_thread = None
+# ---- single-shot "thinking" filler during LLM ----
+filler_proc = None  # type: subprocess.Popen | None
 
-def start_filler_loop():
-    global filler_thread
+def play_one_filler_once():
+    """Play exactly one short filler clip (randomly chosen), non-blocking."""
+    global filler_proc
     files = [
         os.path.join(SOUNDS, "filler_1.wav"),
         os.path.join(SOUNDS, "filler_2.wav"),
@@ -118,24 +122,22 @@ def start_filler_loop():
     files = [f for f in files if os.path.exists(f)]
     if not files:
         return
-    filler_stop.clear()
+    path = random.choice(files)
+    # Play ~2.3s of the clip (keeps it snappy). Adjust if you want the full file.
+    filler_proc = play_wav_for(path, 2.3)
 
-    def loop():
-        i = 0
-        while not filler_stop.is_set():
-            p = play_wav_for(files[i % len(files)], 2.2)
-            if p: p.wait()
-            if filler_stop.is_set():
-                break
-            time.sleep(0.2)
-            i += 1
-
-    filler_thread = threading.Thread(target=loop, daemon=True)
-    filler_thread.start()
-
-def stop_filler_loop():
-    filler_stop.set()
+def stop_filler():
+    """Stop the filler if it's still playing (and ensure no aplay remains)."""
+    global filler_proc
+    if filler_proc and filler_proc.poll() is None:
+        try:
+            os.killpg(os.getpgid(filler_proc.pid), signal.SIGTERM)
+        except Exception:
+            pass
+    filler_proc = None
+    # Also ensure any stray aplay is gone
     stop_playing()
+
 
 # ---- record + converse ----
 def record_until_silence(out_wav):
@@ -157,7 +159,7 @@ def converse(persona, in_wav, out_wav):
     """POST to FastAPI /converse; save reply to out_wav. Fallback to click if it fails."""
     try:
         log(f"[NET] POST {SERVER}")
-        start_filler_loop()
+        play_one_filler_once()
 
         rc = subprocess.call([
             "curl","-s","-X","POST",
@@ -166,14 +168,14 @@ def converse(persona, in_wav, out_wav):
             SERVER, "-o", out_wav
         ])
 
-        stop_filler_loop()
+        stop_filler()
 
         if rc != 0 or not os.path.exists(out_wav) or os.path.getsize(out_wav) < 44:
             raise RuntimeError("server failed")
         return True
     except Exception as e:
         log(f"[NET] ERROR posting to server: {e}")
-        stop_filler_loop()
+        stop_filler()
         subprocess.call(["cp", os.path.join(SOUNDS, "click.wav"), out_wav])
         emit("call_end", {"reason": "net_error"})
         return True
@@ -213,7 +215,7 @@ def on_hook_down():
         log("[HOOK] bounce ignored")
         return
     log("[HOOK] ON cradle")
-    stop_filler_loop()
+    stop_filler()
     stop_playing()
     # kill entire record pipeline group if running
     global recording_proc
@@ -278,7 +280,7 @@ def finalize_digit():
 
         if hook_on_cradle():
             log("[HOOK] Hung up during record; abort.")
-            stop_filler_loop()
+            stop_filler()
             stop_playing()
             kill_stale_capture()
             emit("call_end", {"reason": "hangup_during_record"})
@@ -291,7 +293,7 @@ def finalize_digit():
         if ok and not hook_on_cradle():
             log("[PLAY] Reply…")
             p = play_wav(rwav);  p and p.wait()
-        stop_filler_loop()
+        stop_filler()
         stop_playing()
         emit("call_end", {"reason": "ok"})
 
