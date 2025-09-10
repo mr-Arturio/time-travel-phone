@@ -7,7 +7,10 @@ from gpiozero import Button
 HOOK_GPIO = 13
 DIAL_GPIO = 20
 USB_DEV   = "plughw:CARD=Audio,DEV=0"
-SOUNDS    = os.path.expanduser("~/timephone/sounds")
+SOUNDS = os.environ.get(
+    "SOUNDS_DIR",
+    os.path.join(os.path.dirname(__file__), "sounds")
+)
 
 SERVER    = os.environ.get("CONVERSE_URL", "http://127.0.0.1:8000/converse")
 SERVER_BASE = os.environ.get("EVENTS_BASE", None)
@@ -111,8 +114,21 @@ def kill_stale_capture():
 # ---- single-shot "thinking" filler during LLM ----
 filler_proc = None  # type: subprocess.Popen | None
 
+filler_cancel = threading.Event()
+
+def schedule_filler(delay_sec=1.0):
+    """Start one filler after a small delay unless canceled."""
+    filler_cancel.clear()
+    def _t():
+        time.sleep(delay_sec)
+        if not filler_cancel.is_set():
+            play_one_filler_once()
+    threading.Thread(target=_t, daemon=True).start()
+
+def cancel_filler_schedule():
+    filler_cancel.set()
+
 def play_one_filler_once():
-    """Play exactly one short filler clip (randomly chosen), non-blocking."""
     global filler_proc
     files = [
         os.path.join(SOUNDS, "filler_1.wav"),
@@ -123,11 +139,18 @@ def play_one_filler_once():
     if not files:
         return
     path = random.choice(files)
-    # Play ~2.3s of the clip (keeps it snappy). Adjust if you want the full file.
+    # map filename → caption shown in UI
+    captions = {
+        "filler_1.wav": "Give me just a moment…",
+        "filler_2.wav": "Hmm—let me think…",
+        "filler_3.wav": "One second, please…",
+    }
+    caption = captions.get(os.path.basename(path), "Thinking…")
+    emit("filler_start", {"text": caption})
+
     filler_proc = play_wav_for(path, 2.3)
 
 def stop_filler():
-    """Stop the filler if it's still playing (and ensure no aplay remains)."""
     global filler_proc
     if filler_proc and filler_proc.poll() is None:
         try:
@@ -135,8 +158,8 @@ def stop_filler():
         except Exception:
             pass
     filler_proc = None
-    # Also ensure any stray aplay is gone
     stop_playing()
+    emit("filler_stop", {})
 
 
 # ---- record + converse ----
@@ -159,7 +182,7 @@ def converse(persona, in_wav, out_wav):
     """POST to FastAPI /converse; save reply to out_wav. Fallback to click if it fails."""
     try:
         log(f"[NET] POST {SERVER}")
-        play_one_filler_once()
+        schedule_filler(1.0)
 
         rc = subprocess.call([
             "curl","-s","-X","POST",
@@ -167,7 +190,8 @@ def converse(persona, in_wav, out_wav):
             "-F", f"audio=@{in_wav};type=audio/wav",
             SERVER, "-o", out_wav
         ])
-
+ 
+        cancel_filler_schedule()
         stop_filler()
 
         if rc != 0 or not os.path.exists(out_wav) or os.path.getsize(out_wav) < 44:
@@ -215,6 +239,7 @@ def on_hook_down():
         log("[HOOK] bounce ignored")
         return
     log("[HOOK] ON cradle")
+    cancel_filler_schedule()
     stop_filler()
     stop_playing()
     # kill entire record pipeline group if running
@@ -259,11 +284,19 @@ def finalize_digit():
 
         # ringback → click → greeting
         ringback_for(8)
-        p = play_wav(os.path.join(SOUNDS, "click.wav"));  p and p.wait()
+        ans = os.path.join(SOUNDS, "receiver_lift.wav")
+        if os.path.exists(ans):
+            emit("answer", {"sound": "receiver_lift"})
+            p = play_wav(ans);  p and p.wait()
+        else:
+            emit("answer", {"sound": "click"})
+            p = play_wav(os.path.join(SOUNDS, "click.wav"));  p and p.wait()
+
         stop_playing()
 
         greet = os.path.join(SOUNDS, "greet_einstein.wav")
         if os.path.exists(greet):
+            emit("greet", {"text": "Hello—Einstein listening. How may I help you today?"})
             p = play_wav(greet);  p and p.wait()
         else:
             log("[GREET] greet_einstein.wav not found; skipping.")
