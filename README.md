@@ -12,6 +12,16 @@ API: FastAPI routes for /converse, /health, /events; personas via personas.json
 
 Dashboard: /ui static page consuming SSE events to visualize call lifecycle
 
+
+```
+# Pod shell
+git clone https://github.com/mr-Arturio/time-travel-phone.git /time-travel-phone
+cd /time-travel-phone
+chmod +x pod-bootstrap.sh
+./pod-bootstrap.sh
+
+```
+
 Run:
 
 ## Fresh Pod:
