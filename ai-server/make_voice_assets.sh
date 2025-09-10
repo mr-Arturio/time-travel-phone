@@ -6,17 +6,28 @@ mkdir -p "$ASSETS_DIR"
 
 PIPER_BIN=${PIPER_BIN:-/root/piper/build/piper}
 
-# Default Einstein voice (German male)
+# Default Einstein voice (override these when running if you like)
 EINSTEIN_VOICE=${EINSTEIN_VOICE:-/root/piper/voices/de_DE-thorsten-high.onnx}
 EINSTEIN_JSON=${EINSTEIN_JSON:-${EINSTEIN_VOICE}.json}
+
+# Set FORCE=1 to overwrite existing files
+FORCE=${FORCE:-0}
 
 gen_with_voice() {
   local voice="$1"; shift
   local json="$1";  shift
   local out="$1";   shift
   local text="$*"
+
+  if [[ "$FORCE" == "1" ]]; then
+    rm -f "$ASSETS_DIR/$out" || true
+  fi
+
   if [[ ! -s "$ASSETS_DIR/$out" ]]; then
     echo "$text" | "$PIPER_BIN" --model "$voice" ${json:+-c "$json"} --output_file "$ASSETS_DIR/$out"
+    echo "wrote $out"
+  else
+    echo "exists $out"
   fi
 }
 
