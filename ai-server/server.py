@@ -1,5 +1,5 @@
 from fastapi import FastAPI, UploadFile, Form
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse
 import io, os, re, tempfile, subprocess, time, json, pathlib, shlex
 from datetime import datetime, timezone
 from collections import deque
@@ -24,6 +24,11 @@ app.include_router(event_router)
 UI_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "ui-dashboard"))
 app.mount("/ui", StaticFiles(directory=UI_DIR, html=True), name="ui")
 
+# Assets (greeting/fillers)
+ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
+if os.path.isdir(ASSETS_DIR):
+    app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
+    
 # ---------- Config / Env ----------
 WHISPER_MODEL  = os.environ.get("WHISPER_MODEL", "small.en")
 WHISPER_DEVICE = os.environ.get("WHISPER_DEVICE", "cpu")         # "cpu" or "cuda"

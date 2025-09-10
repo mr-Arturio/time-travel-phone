@@ -39,10 +39,7 @@ curl -s http://127.0.0.1:8011/v1/models | head -c 200; echo
                  
 ```
 Open tunnel in a new tab:
-ssh -vv -N -g -i $env:USERPROFILE\.ssh\id_ed25519`
-    -p <podPort> `
-    -L 0.0.0.0:8000:127.0.0.1:8000`
-    root@<podIP>
+ssh -vv -N -g -i $env:USERPROFILE\.ssh\id_ed25519 -p <podPort> -L 0.0.0.0:8000:127.0.0.1:8000 root@<podIP>
 
 Exposes your pod’s API :8000 on your laptop for the Pi to use.
 

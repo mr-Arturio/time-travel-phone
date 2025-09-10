@@ -23,5 +23,12 @@ else
   export WHISPER_COMPUTE="${WHISPER_COMPUTE:-float32}"
 fi
 
+# 🔊 Ensure voice assets exist (fast, idempotent)
+if [ -x "$THIS_DIR/make_voice_assets.sh" ]; then
+  bash "$THIS_DIR/make_voice_assets.sh"
+else
+  echo "ℹ️  $THIS_DIR/make_voice_assets.sh not found or not executable; skipping asset generation."
+fi
+
 # Start API
 exec python -m uvicorn server:app --host 0.0.0.0 --port "${PORT:-8000}"
