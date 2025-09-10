@@ -79,7 +79,7 @@ def play_wav(path, loop=False):
     if loop:
         def looper():
             while True:
-                p = subprocess.Popen(args)
+                p = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 rc = p.wait()
                 if rc != 0:
                     break
@@ -88,15 +88,19 @@ def play_wav(path, loop=False):
         t.start()
         return None
     else:
-        return subprocess.Popen(args)
+        return subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
 
 def play_wav_for(path, seconds: float):
     secs = max(0.1, float(seconds))
+    # Output RAW PCM from sox → aplay in RAW mode; add -q to keep sox quiet
     cmd = (
-        f"sox {shlex.quote(path)} -t wav - trim 0 {secs} | "
-        f"aplay -q -D {USB_DEV} -t wav -"
+        f"sox -q {shlex.quote(path)} -r 16000 -b 16 -e signed-integer -c 1 -t raw - trim 0 {secs} | "
+        f"aplay -q -D {USB_DEV} -t raw -f S16_LE -r 16000 -c 1 -"
     )
-    return subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid)
+    return subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid,
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
 
 def stop_playing():
     # stop any aplay quickly
@@ -189,17 +193,18 @@ def stop_filler():
 
 # ---- record + converse ----
 def record_until_silence(out_wav):
-    """Record mic; stop ~2s after trailing silence, with a hard cap so device always frees."""
     global recording_proc
     stop_playing()
     kill_stale_capture()
     cmd = (
         f"{ARECORD_PAT} -f S16_LE -c1 -r16000 -d {MAX_RECORD_SEC} | "
-        f"sox -t wav - -t wav {out_wav} silence 1 0.2 2% 1 2.0 2%"
+        f"sox -q -t wav - -t wav {out_wav} silence 1 0.2 2% 1 2.0 2%"
     )
-    recording_proc = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid)
+    recording_proc = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     recording_proc.wait()
     recording_proc = None
+
 
 def converse(persona, in_wav, out_wav):
     """POST to FastAPI /converse; save reply to out_wav. Fallback to click if it fails."""
