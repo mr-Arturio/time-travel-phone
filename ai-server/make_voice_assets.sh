@@ -19,4 +19,11 @@ gen() {
 # Einstein greeting (more lines later for "thinking" fillers)
 gen greet_einstein.wav "Hello—Einstein listening. How may I help you today?"
 
+# Einstein “thinking” fillers (very short)
+gen filler_1.wav "Hmm… give me a second."
+gen filler_2.wav "Interesting—let me think."
+gen filler_3.wav "One moment, please."
+gen filler_4.wav "Let me check my notes."
+gen filler_5.wav "I'll be right back."
+
 echo "Assets ready in $ASSETS_DIR"
