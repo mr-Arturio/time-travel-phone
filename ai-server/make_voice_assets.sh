@@ -7,7 +7,7 @@ mkdir -p "$ASSETS_DIR"
 PIPER_BIN=${PIPER_BIN:-/root/piper/build/piper}
 
 # Default Einstein voice (override these when running if you like)
-EINSTEIN_VOICE=${EINSTEIN_VOICE:-/root/piper/voices/de_DE-thorsten-high.onnx}
+EINSTEIN_VOICE=${EINSTEIN_VOICE:-/root/piper/voices/en_US-ryan-high.onnx}
 EINSTEIN_JSON=${EINSTEIN_JSON:-${EINSTEIN_VOICE}.json}
 
 # Set FORCE=1 to overwrite existing files
