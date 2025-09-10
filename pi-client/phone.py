@@ -173,7 +173,7 @@ def play_one_filler_once():
         "filler_5.wav": "I'll be right back…",
     }
     caption = captions.get(os.path.basename(path), "Thinking…")
-    emit("filler_start", {"text": caption})
+    emit("filler_start", {"caption": caption})
     filler_proc = play_wav_for(path, 2.3)
 
 def stop_filler():
@@ -317,7 +317,7 @@ def finalize_digit():
 
         greet = find_sound("greet_einstein.wav")
         if greet:
-            emit("greet", {"text": "Hello—Einstein listening. How may I help you today?"})
+            emit("greet", {"caption": "Hello—Einstein listening. How may I help you today?"})
             p = play_wav(greet);  p and p.wait()
         else:
             log("[GREET] greet_einstein.wav not found; skipping.")
