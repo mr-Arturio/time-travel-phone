@@ -1,5 +1,28 @@
 Instruction on How to Connect Rotary Phone with Raspbbery Pi 4
 
+
+List of parts
+Rotary Phone Northern Telecom
+Raspberry Pi 4B Starter Kit with 4 GB
+Assembled Pi Cobbler Plus - Breakout Cable for Raspberry Pi A+/B+/Pi 2/Pi 3
+Set of Jumper Cable - at least 10
+Resistor 1K OHM 1/4W 5% AXIAL - you will need 2, take pack of 10 they are less then 2 CAD
+Half-size 400-Pin DIY Breadboard
+USB external sound card audio adapter - USB to Audio Jack Adapter
+ 0.1 µF ceramic capacitors ×2 they were out of stock i took Polypropylene Film Capacitors. 0.1 µF
+ Erbuds with mic and jack
+
+Tools:
+Digital Multimeter
+Zip ties
+Heat Shrink Pack + lighter
+two sided stick tape
+scredriver
+multitool or something that you can clean the wires
+Tape
+PlayDoh
+
+
 ## For the Hook
 Do this (Pi power OFF):
 - White wire → GND row on the Cobbler (not the rail):

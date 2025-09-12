@@ -28,7 +28,7 @@ Lift the handset, dial a number, and famous person answers your call. You ask a 
 
 The steps below assume you have a running Pod (remote server) and a Pi on your LAN.
 
-1. Bring up the Pod (server)
+### 1. Bring up the Pod (server)
 
 ```bash
 # On your pod or Linux server (SSH shell)
@@ -39,7 +39,7 @@ chmod +x install-piper.sh install-llm.sh env.auto.sh \
         start_vllm.sh start_api.sh run.sh make_voice_assets.sh
 ```
 
-2. One-time installs
+### 2. One-time installs
 
 ```bash
 # Build Piper + fetch voice
@@ -49,7 +49,7 @@ chmod +x install-piper.sh install-llm.sh env.auto.sh \
 ./install-llm.sh
 ```
 
-3. Start the LLM (vLLM on :8011)
+### 3. Start the LLM (vLLM on :8011)
 
 ```bash
 ./start_vllm.sh
@@ -58,7 +58,7 @@ curl -s http://127.0.0.1:8011/v1/models | head -c 200; echo
 # Expect JSON with "openai/gpt-oss-20b"
 ```
 
-4. First-time server deps + API on :8000
+### 4. First-time server deps + API on :8000
 
 ```bash
 # Creates .venv, installs requirements, then starts API on :8000
@@ -116,7 +116,17 @@ Open the dashboard
 
 ## Raspbery Pi setup
 >Full wiring and audio prep are in [HARDWARE.md](). Below are the software steps to call the server.
-1. Get the code & tools
+### 0. Start Pi
+```bash
+ssh <username>@<hostname>  # ssh mrart@timephone
+  or
+ssh <username>@<Pi IP Address> # ssh mrart@192.168.0.153
+# enter your password
+```
+
+
+
+### 1. Get the code & tools
 ```bash
 # on the Pi
 sudo apt update
@@ -133,7 +143,7 @@ sox --version
 curl --version
 ```
 
-2. Point the Pi at your laptop (tunneled API)
+### 2. Point the Pi at your laptop (tunneled API)
 >Find your **laptop’s LAN IP**, e.g. `192.168.0.155:`
 ```bash
 export CONVERSE_URL="http://192.168.0.155:8000/converse"
@@ -145,13 +155,12 @@ curl -s http://192.168.0.155:8000/health | jq
 # Expect "ok": true
 ```
 
-3. Sync demo sounds
+### 3. Sync demo sounds
 ```bash
 chmod +x ~/projects/time-travel-phone/pi-client/bin/sync_sounds.sh
 ./bin/sync_sounds.sh
 ```
-
-4. Run the phone client
+### 4. Run the phone client
 ```
 /projects/time-travel-phone/pi-client $ ./phone.py
 ```
@@ -160,23 +169,43 @@ chmod +x ~/projects/time-travel-phone/pi-client/bin/sync_sounds.sh
 - Dial 314 → ringback → short greeting → ask Einstein a question → filler
 - Hear the reply played through the handset
 
+#### Tiny desktop tester (no Pi)
+```powershell
+# On Windows (Python 3.8)
+py -3.8 .\tiny_client\client.py
+# speaks, sends to /converse, and plays reply.wav
+```
 
-Architecture
-Raspberry Pi 4 installed in the old rotarry phone
+### Daily start (after first setup)
+```bash
+# on the pod / server
+cd /time-travel-phone/ai-server
+bash env.auto.sh             # sets caches/TMP to /workspace (or $HOME)
+./start_vllm.sh              # vLLM on :8011
+./start_api.sh               # FastAPI on :8000
 
-Speech‑to‑Text: faster‑whisper (CPU by default; leverages CUDA when present)
+```
+Open the tunnel from your laptop (as above), then run the Pi client.
+___
+### Dachboard
+- URL: http://localhost:8000/ui/
+- Shows status (LLM endpoint/model, Whisper device, Piper path)
+- Live events via SSE: phone_start, stt_start/done, llm_start/done, tts_start/done, call_end
+- Groups by call ID, shows transcript/response preview and timings
 
-LLM: vLLM serving openai/gpt-oss-20b (OpenAI API shim)
 
-Text‑to‑Speech: Piper ONNX voice en_US-amy-low.onnx
+## Roadmap
+- More personas (Newton, Curie, Lincoln)
+- “School/Museum” mode (allowlist + time limits)
+- Barge-in (interrupt TTS when user starts speaking)
+- Style presets (gentle/professor/excited)
+- Optional LoRA adapters and prompt librarie
 
-API: FastAPI routes for /converse, /health, /events; personas via personas.json
 
-Dashboard: /ui static page consuming SSE events to visualize call lifecycle
+
 
 I prefer this step by step installation, it is easier to catch an error, debug adn test every step
 
-Run:
 
 ## Fresh Pod:
 
@@ -230,13 +259,7 @@ bash env.auto.sh             # sets caches/TMP to /workspace (or $HOME)
 
 ## To start the Pi
 
-```
-ssh <username>@<hostname>  # ssh mrart@timephone
-  or
-ssh <username>t@<Pi IP Address> # ssh mrart@192.168.0.153
-```
 
-- enter your password
 - git clone https://github.com/mr-Arturio/time-travel-phone.git
 
 ```
