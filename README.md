@@ -9,7 +9,7 @@ Lift the handset, dial a number, and famous person answers your call. You ask a 
 
 - **Server**: Linux host or GPU pod (RunPod/AWS/etc). CPU works; GPU recommended for faster LLM/Whisper.
 - **Raspberry Pi 4B** 4 GB or more with Raspberry Pi OS, Wi-Fi or Ethernet.
-- **Rotary phone hardware** (mechanical dial, hook switch, shell), USB sound dongle, handset mic/earbuds. See full list with Hardware instructions here - [Hardware.md](./docs\Hardware.md)
+- **Rotary phone hardware** (mechanical dial, hook switch, shell), USB sound dongle, handset mic/earbuds. See full list with Hardware instructions here - [Hardware.md](./docs/Hardware.md)
 
 ### Software stack
 
