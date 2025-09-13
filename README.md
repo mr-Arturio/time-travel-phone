@@ -125,7 +125,6 @@ ssh <username>@<Pi IP Address> # ssh mrart@192.168.0.153
 ```
 
 
-
 ### 1. Get the code & tools
 ```bash
 # on the Pi
