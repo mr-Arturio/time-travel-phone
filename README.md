@@ -115,7 +115,7 @@ Open the dashboard
 ```http://localhost:8000/ui/```
 
 ## Raspbery Pi setup
->Full wiring and audio prep are in [HARDWARE.md](). Below are the software steps to call the server.
+>Full wiring and audio prep are in [Hardware.md](./docs/Hardware.md). Below are the software steps to call the server.
 ### 0. Start Pi
 ```bash
 ssh <username>@<hostname>  # ssh mrart@timephone
