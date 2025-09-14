@@ -5,8 +5,34 @@
 _An old rotary desk phone brought back to life with a Raspberry Pi and modern speech AI.
 Lift the handset, dial a number, and famous person answers your call. You ask a question; he thinks, then replies out loud in a character._
 
-### Requirements
+>### ⚠️ Content disclaimer
+> **Historical names are used in an educational, fictional context.**<br>
+>**Voices are stylized approximations**, not authentic reproductions.<br>
+>No trademark misuse or impersonation claims: this is a **demo prototype** for learning and exploration. <br>
+**No endorsement** is implied by any estate or institution.
 
+I’m aiming for that old-school call flow, not just “press a button → hear a bot.” So I added a bunch of little touches:
+- **Dial tone** the instant you lift the handset. It keeps humming until you start dialing.
+- **Ringback** for two quick beeps while the “other side” connects—just like a real line.
+- **Receiver-lift click** (that tiny clack you hear when someone picks up).
+- **Greeting in character:** one of several short, randomized intros (e.g., “Hello—Einstein listening…”).
+These are _generated at server start_ with the same **voice** and **style** as the live answers—so when I change persona prompts or voices, greetings match automatically. No stale, pre-baked clips.
+- **Natural pause + “thinking” filler** after your question: ~2s later you you may hear a short in-character line (e.g., _“Hmm… give me a second.”_). I keep a small pool and pick one at random—generated at startup in the same voice — so it **bridges the wait while the reply is being generated** and makes the pause feel intentional.
+- Then the **answer** — short, warm, era-appropriate.<br>
+
+All of this is to create the feeling of a **phone conversation**, not a web demo. You’re holding a real handset; the audio pacing and little sounds do a lot of the heavy lifting.
+
+### Call flow (at a glance)
+1. Handset up → **dial tone** starts.
+2. You dial 3 digits → **dial tone stops** on first pulse.
+3. System “connects” → **ringback (2 beeps)**.
+4. “Other side” answers → **receiver-lift sound**.
+5. **Greeting** (randomized, in persona).
+6. You speak → **recording** stops after a short silence.
+7. After ~2s → **brief “thinking”** filler (randomized, in persona).
+8. **Reply** plays back in the same voice and style.
+
+### Requirements
 - **Server**: Linux host or GPU pod (RunPod/AWS/etc). CPU works; GPU recommended for faster LLM/Whisper.
 - **Raspberry Pi 4B** 4 GB or more with Raspberry Pi OS, Wi-Fi or Ethernet.
 - **Rotary phone hardware** (mechanical dial, hook switch, shell), USB sound dongle, handset mic/earbuds. See full list with Hardware instructions here - [Hardware.md](./docs/Hardware.md)
@@ -201,93 +227,3 @@ ___
 - Optional LoRA adapters and prompt librarie
 
 ___
-# Ignore Old notes below
-
-I prefer this step by step installation, it is easier to catch an error, debug adn test every step
-
-
-## Fresh Pod:
-
-```
-# Pod shell
-git clone https://github.com/mr-Arturio/time-travel-phone.git
-cd time-travel-phone/ai-server
-
-chmod +x install-piper.sh install-llm.sh env.auto.sh start_vllm.sh start_api.sh run.sh make_voice_assets.sh
-
-# One-time installs
-./install-piper.sh
-./install-llm.sh
-
-# Start vLLM (8011) – uses env.auto.sh internally
-./start_vllm.sh
-
-./make_voice_assets.sh
-
-# First time only: set up venv + deps
-./run.sh    # (creates venv, installs requirements, then starts API on :8000)
-# ^ If you prefer keeping run.sh only for installs, Ctrl+C and then:
-# ./start_api.sh   # start API with env.auto.sh sourced
-
-```
-
-Open tunnel in a new tab:
-ssh -vv -N -g -i $env:USERPROFILE\.ssh\id_ed25519 -p <podPort> -L 0.0.0.0:8000:127.0.0.1:8000 root@<podIP>
-
-Exposes your pod’s API :8000 on your laptop for the Pi to use.
-
-curl http://localhost:8011/v1/models
-curl http://localhost:8000/health
-
-On laptop tab:
-
-Check and update the podPort - $podPort in start-time-travel.ps1
-powershell -ExecutionPolicy Bypass -File .\start-time-travel.ps1
-
-On laptop (new window): py -3.8 C:\Users\mrart\time-travel-phone\tiny_client\client.py
-
-##Daily start
-
-```
-cd /time-travel-phone/ai-server
-bash env.auto.sh             # sets caches/TMP to /workspace (or $HOME)
-./start_vllm.sh              # brings up vLLM on :8011
-./start_api.sh               # brings up FastAPI on :8000
-
-```
-
-## To start the Pi
-
-
-- git clone https://github.com/mr-Arturio/time-travel-phone.git
-
-```
-sudo apt update
-sudo apt install -y sox libsox-fmt-all curl jq
-# Quick check
-sox --version
-curl --version
-
-```
-
-- do all the audio and hook tests
-  Run the client with the correct server URL
-  export CONVERSE_URL="http://192.168.0.155:8000/converse"
-
-```
-/projects/time-travel-phone/pi-client $ ./phone.py
-```
-
-### From the Pi, verify reachability to your laptop
-
-curl -s http://<LAPTOP_IP_ON_LAN>:8000/health | jq
-curl -s http://192.168.0.155:8000/health | jq
-
-export CONVERSE_URL="http://<your-laptop-LAN-IP>:8000/converse"
-export CONVERSE_URL="http://192.168.0.155:8000/converse"
-export EVENTS_BASE="http://192.168.0.155:8000"
-
-chmod +x ~/projects/time-travel-phone/pi-client/bin/sync_sounds.sh
-./sync_sounds.sh
-
-Dashboard: http://localhost:8000/ui/
