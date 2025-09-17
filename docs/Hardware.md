@@ -5,13 +5,13 @@ _This is my “from-zero” logbook for turning a Northern Telecom rotary phone 
 >- **We are not connecting to the public phone network.**
 >- **Unplug power whenever you touch GPIO or rewire anything.**
 >- **Avoid touching bare pins or the underside of the Pi while powered.**
->- **Old phones can have sticky tar/gel in the 425B block—messy but not toxic.**
+>- **Old phones can have sticky tar/gel in the 425B block it is messy but not toxic.**
 ---
 
 ### Parts List
 - Rotary Phone Northern Telecom
 - Raspberry Pi 4B Starter Kit with 4 GB <br> 
-<img src="./Pi_Kit.jpg" alt="Raspberry Pi 4B Starter Kit" width="300" style="margin:10px 0 20px 0"/>
+<img src="./Pi_Kit.jpg" alt="Raspberry Pi 4B Starter Kit" width="350" style="margin:10px 0 20px 0"/><br>
   - I picked a Raspberry Pi 4B Starter Kit because it’s perfect for first-timers (me). It included:
     - Pi 4B (4 GB RAM)
     - Case
@@ -32,9 +32,9 @@ _This is my “from-zero” logbook for turning a Northern Telecom rotary phone 
 
 Tools (what I actually used):
 - Digital Multimeter<br>
-<img src="./Multimeter.jpg" alt="Raspberry Pi 4B Starter Kit" width="300" style="margin:10px 0 20px 0;"/>
+<img src="./Multimeter.jpg" alt="Raspberry Pi 4B Starter Kit" width="350" style="margin:10px 0 20px 0;"/>
 - Screwdriver, nippers, pliers, small multitool (for cleaning wire ends)
-<img src="./tools.jpg" alt="Raspberry Pi 4B Starter Kit" width="300" style="margin:10px 0 20px 0;"/>
+<img src="./tools.jpg" alt="Raspberry Pi 4B Starter Kit" width="350" style="margin:10px 0 20px 0;"/>
 - Heat Shrink Pack + lighter
 - Zip ties
 - Mounting tape
@@ -45,14 +45,14 @@ Tools (what I actually used):
 <img src="./Alligato_clips.jpg" alt="Raspberry Pi 4B Starter Kit" width="200" style="margin:10px 0 20px 0;"/>
 
 ## Step 1 — Prepare the phone
-<img src="./without_shell.jpg" alt="phone without the shell" width="300" style="margin:10px 0 5px 0;"/> <br>
+<img src="./without_shell.jpg" alt="phone without the shell" width="350" style="margin:10px 0 5px 0;"/> <br>
 - Remove the shell and get familiar with the mechanics—how the **cradle (hook switch)** works and how the **rotary dial** returns. Grab the multimeter and poke around (in continuity/beep mode). 
 - Use the NET 425B block as a map to trace wiring. We need:
     - **Two wires from the dial** (the pulse contacts)
     - **Two wires from the hook switch** (cradle)
 - Remove the handset - unscrew the wiring for the handset cord or cut them.
 - You can **remove the ringer (bells) module** if you’re not planning to make the phone ring. If you want incoming-call effects later, leave it
-<img src="./Bell_remove.jpg" alt="bell remove schema" width="300" style="margin:10px 0 5px 0;"/> <br>
+<img src="./Bell_remove.jpg" alt="bell remove schema" width="350" style="margin:10px 0 5px 0;"/> <br>
 - Unscrew the dial, get familiar with the construction, see the mechanics how it works. You’ll usually find 4 wires:
     - 2 wires = dial pulses (open/close while the dial returns)
     - 2 wires = “mic mute” while dialing (prevents noise)
@@ -61,7 +61,7 @@ Tools (what I actually used):
     - Put the meter in continuity (beep) mode. Touch one probe to each candidate pair. Dial a number and let the dial return slowly. You should hear beep bursts that match the digit you dialed (e.g., “3” → three bursts).
      >If your meter can’t keep up (mine couldn’t), hold the dial at the end of the rotation >and manually let it return slowly with your hand—you’ll hear the bursts. This is where >alligator clips really help—I wish I had them.<br>
 - Mark the pulse pair. The other two (mic-mute) can be isolated and taped out of the way for future experiments (e.g., fake “dialing” click sound).<br>
-<img src="./Dial.jpg" alt="phone without the shell" width="200" height="250" style="margin:10px 0 5px 0;"/> <br>
+<img src="./Dial.jpg" alt="phone without the shell" width="250" height="300" style="margin:10px 0 5px 0;"/> <br>
 - **Find the cradle (hook) pair:** Trace the two leads from the hook switch to the NET 425B. With the multimeter, you should see:
   - On cradle: open circuit (no beep)
   - Lifted: closed (long beep)<br>
@@ -69,12 +69,12 @@ Mark these two.
 - Now we can remove the NET 425B block to give more room for the Pi and breadboard. Disconnect all the wires from the block. The block itself is full of sticky wax/goop inside. I tried to pull it apart and made a mess (WD-40 + dish soap cleaned my hands). What finally worked was drilling out the two bottom pins and popping it free. If you can, just drill it from the back and avoid the goo entirely.
 - You should now have a clean base with:
    - 2 wires from the cradle that we need (dont cut other wires - we will cut them after connecting and be sure that we got the right pair)
-   - 2 wires from the dial pulse contacts
-   <img src="./naked.jpg" alt="phone without the shell" width="300" style="margin:10px 0 5px 0;"/> <br>
+   - 2 wires from the dial pulse contacts<br>
+   <img src="./naked.jpg" alt="phone without the shell" width="350" style="margin:10px 0 5px 0;"/> <br>
 
 
 ### Step 2 — Prepare the Raspberry Pi
-<img src="./pi_schema.jpg" alt="Raspberry Pi 4B Starter Kit" width="300" style="margin:10px 0 20px 0;"/> <br>
+<img src="./pi_schema.jpg" alt="Raspberry Pi 4B Starter Kit" width="350" style="margin:10px 0 20px 0;"/> <br>
 - Download Raspberry Pi Imager - https://www.raspberrypi.com/software/ <br>
 - Here i the clear [Getting Started](https://www.raspberrypi.com/documentation/computers/getting-started.html) instruction with all the required steps and how to [Install an operation system](https://www.raspberrypi.com/documentation/computers/getting-started.html#installing-the-operating-system) and setup the WiFi connection.
 - In Imager, set:
@@ -120,7 +120,7 @@ Black ── 1kΩ ──> (row of #13)
                  (GND row)
 White  ───────────────────────────────────────────────> (GND row)
 ```
-<img src="./wiring.jpg" alt="Raspberry Pi 4B Starter Kit" width="300" style="margin:10px 0 20px 0;"/> <br>
+<img src="./wiring.jpg" alt="Raspberry Pi 4B Starter Kit" width="350" style="margin:10px 0 20px 0;"/> <br>
 ## For the Dial
 - Blue wire into the  GND row on the Cobbler
 - Choose an empty inner row (not the long +/– rails).
