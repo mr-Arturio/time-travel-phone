@@ -61,24 +61,45 @@ Tools (what I actually used):
     - Put the meter in continuity (beep) mode. Touch one probe to each candidate pair. Dial a number and let the dial return slowly. You should hear beep bursts that match the digit you dialed (e.g., “3” → three bursts).
      >If your meter can’t keep up (mine couldn’t), hold the dial at the end of the rotation >and manually let it return slowly with your hand—you’ll hear the bursts. This is where >alligator clips really help—I wish I had them.<br>
 - Mark the pulse pair. The other two (mic-mute) can be isolated and taped out of the way for future experiments (e.g., fake “dialing” click sound).<br>
-<img src="./Dial.jpg" alt="phone without the shell" width="300" style="margin:10px 0 5px 0;"/> <br>
-- now to locate the cradle wires:  locate all wires coming of cradle mechanism, see where they connect to NEt 425B block. With multimeter find 2 that responsible for cradle. Cradle on - no signal, cardle lift long signal. mark them
-- uscrew/cut all the wires from NEt 425B block
-- now yu can remove NEt 425B block - i spend some time doind it, it got messy becouse the is some gue inside this block, nothing toxic or dangerous just too sticky, so i recoment to try and to drill out two pins on the buttom of the fnone that holds the block.I ended up removing the iner part of NEt 425B block, get myself and all around in this yacky vaselin-glue thing, ascking GPT to how to clean it from my hads (use WD-40 and dish soap), after i got this shell of NEt 425B block - i swing it back and force with Pliers, removed it and there was a metall thing underneth that i  ended up removing with the drill... So just try to trill it out from the back of phone - see image
-- You should have clear phone base with wires comming from cradle adn 4 wires from dial
+<img src="./Dial.jpg" alt="phone without the shell" width="200" height="250" style="margin:10px 0 5px 0;"/> <br>
+- **Find the cradle (hook) pair:** Trace the two leads from the hook switch to the NET 425B. With the multimeter, you should see:
+  - On cradle: open circuit (no beep)
+  - Lifted: closed (long beep)<br>
+Mark these two.
+- Now we can remove the NET 425B block to give more room for the Pi and breadboard. Disconnect all the wires from the block. The block itself is full of sticky wax/goop inside. I tried to pull it apart and made a mess (WD-40 + dish soap cleaned my hands). What finally worked was drilling out the two bottom pins and popping it free. If you can, just drill it from the back and avoid the goo entirely.
+- You should now have a clean base with:
+   - 2 wires from the cradle that we need (dont cut other wires - we will cut them after connecting and be sure that we got the right pair)
+   - 2 wires from the dial pulse contacts
+   <img src="./naked.jpg" alt="phone without the shell" width="300" style="margin:10px 0 5px 0;"/> <br>
 
-Step 2 <br>
-<img src="./pi_schema.jpg" alt="Raspberry Pi 4B Starter Kit" width="300" style="margin:10px 0 20px 0;"/>
-- Download Raspberry Pi Imager - https://www.raspberrypi.com/software/
-- Here i the clear [Getting Started](https://www.raspberrypi.com/documentation/computers/getting-started.html) instruction with all the required steps and how to [Install an operation system](https://www.raspberrypi.com/documentation/computers/getting-started.html#installing-the-operating-system) and setup the WiFi connection. Just make sure that you have no other memory cards or any other storage devices connected - to avoid accidentace removal all the information from them. 
-- Istall sD card intom Pi, power it up. And try to connect to it through your terminal -- `ssh <username>@<hostname>` or `ssh <username>@<Pi IP Address>`. If you failed to connect with hostname - try Pi IP Adress to find it:  to login to your wifi aadmin page -informationcan be found at the back of your wifi, and find if the system sees your Pi as connected devices - Host name will be sameas you provided during instalation. and there you can find Ip Address. Here is detailed [Configuration on first boot](https://www.raspberrypi.com/documentation/computers/getting-started.html#configuration-on-first-boot) instructions with troubleshooting. If its not there, First try to unplu and plug bsck you Pi, wait a minute till the green light stop blinking on the Pi and ttry again, if still no go - i recomended to reinstall operation system ance again,  take out sD card - inserd into your laptop and lunch Imager once again, fill up WiFi name and password with caution foloww insrtructions afte rsucessful instalatiuon inser sD card back to Pi - powe rit up, give it few minutes and try terminal again, after succesfull conectuion it will ask you to type the password - and you are connected.
-If still it could not comnnect to WiFi - use Ethernet connection if available, and check your intterne Admin page ance again to see the Pi connected. If still not suceeded, you can connect monitore with provided cable from the kit, connect keyboard and mouse and astr Pi and you will see operation system refer to [Configuration on first boot](https://www.raspberrypi.com/documentation/computers/getting-started.html#configuration-on-first-boot) instructions.
+
+### Step 2 — Prepare the Raspberry Pi
+<img src="./pi_schema.jpg" alt="Raspberry Pi 4B Starter Kit" width="300" style="margin:10px 0 20px 0;"/> <br>
+- Download Raspberry Pi Imager - https://www.raspberrypi.com/software/ <br>
+- Here i the clear [Getting Started](https://www.raspberrypi.com/documentation/computers/getting-started.html) instruction with all the required steps and how to [Install an operation system](https://www.raspberrypi.com/documentation/computers/getting-started.html#installing-the-operating-system) and setup the WiFi connection.
+- In Imager, set:
+  - Hostname, username/password
+  - Enable SSH
+  - Wi-Fi SSID/password (if you’re not using Ethernet)<br>
+>**Tip:** Unplug other USB drives or SD cards to avoid imaging the wrong device.
+### First boot + SSH
+1. Insert the SD, power up the Pi, give it a minute until the green LED calms down.
+2. Try to SSH in:
+```bash
+ssh <username>@<hostname>
+# or
+ssh <username>@<PI_IP_ADDRESS>
+```
+
+
+ If you failed to connect with hostname - try Pi IP Adress to find it:  login to your wifi admin page -information can be found at the back of your wifi router, and find if the system sees your Pi as connected devices - Host name will be same as you provided during installation. and there you can find Ip Address. Here is detailed [Configuration on first boot](https://www.raspberrypi.com/documentation/computers/getting-started.html#configuration-on-first-boot) instructions with troubleshooting. If its not there, First try to unplug and plug back you Pi, wait a minute till the green light stop blinking on the Pi and try again, if still no go - i recommended to reinstall operation system once again,  take out sD card - insert into your laptop and lunch Imager once again, fill up WiFi name and password with caution follow instruction after successful installation insert sD card back to Pi - power it up, give it few minutes and try terminal again, after successful connection it will ask you to type the password - and you are connected.
+If still it could not connect to WiFi - use Ethernet connection if available, and check your internet Admin page once again to see the Pi connected. If still not succeeded, you can connect monitor with provided cable from the kit, connect keyboard and mouse and astr Pi and you will see operation system refer to [Configuration on first boot](https://www.raspberrypi.com/documentation/computers/getting-started.html#configuration-on-first-boot) instructions.
 Cangrats! Your Pi is up and running!
 **Avoid holding the board or touching GPIO pins** when the board is powered. Shorting the pins can easily damage the board, rendering it unusable.
 
-Step 3 wiring
+### Step 3 wiring
 - connect T Cobbler to the Pi
-![]()
+
 
 ## For the Hook
 Do this (Pi power OFF):
@@ -99,7 +120,7 @@ Black ── 1kΩ ──> (row of #13)
                  (GND row)
 White  ───────────────────────────────────────────────> (GND row)
 ```
-
+<img src="./wiring.jpg" alt="Raspberry Pi 4B Starter Kit" width="300" style="margin:10px 0 20px 0;"/> <br>
 ## For the Dial
 - Blue wire into the  GND row on the Cobbler
 - Choose an empty inner row (not the long +/– rails).

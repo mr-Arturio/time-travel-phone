@@ -3,7 +3,9 @@
 <small>Build for **OpenAI Open Model Hackathon**</small><br>
 
 _An old rotary desk phone brought back to life with a Raspberry Pi and modern speech AI.
-Lift the handset, dial a number, and famous person answers your call. You ask a question; he thinks, then replies out loud in a character._
+Lift the handset, dial a number, and famous person answers your call. You ask a question; he thinks, then replies out loud in a character._ <br>
+___
+**[Hardware Instruction](./docs/Hardware.md)**
 
 >### ⚠️ Content disclaimer
 > **Historical names are used in an educational, fictional context.**<br>
