@@ -10,7 +10,8 @@ _This is my “from-zero” logbook for turning a Northern Telecom rotary phone 
 
 ### Parts List
 - Rotary Phone Northern Telecom
-- Raspberry Pi 4B Starter Kit with 4 GB <br> <img src="./Pi_Kit.jpg" alt="Raspberry Pi 4B Starter Kit" width="300" style="margin:10px 0 20px 0"/>
+- Raspberry Pi 4B Starter Kit with 4 GB <br> 
+<img src="./Pi_Kit.jpg" alt="Raspberry Pi 4B Starter Kit" width="300" style="margin:10px 0 20px 0"/>
   - I picked a Raspberry Pi 4B Starter Kit because it’s perfect for first-timers (me). It included:
     - Pi 4B (4 GB RAM)
     - Case
@@ -43,17 +44,24 @@ Tools (what I actually used):
 - Nice-to-have (I didn’t have them this time): Alligator Clip Multimeter Leads<br>
 <img src="./Alligato_clips.jpg" alt="Raspberry Pi 4B Starter Kit" width="200" style="margin:10px 0 20px 0;"/>
 
-## Step 1 — Open the phone & explore
-<img src="./without_shell.jpg" alt="Raspberry Pi 4B Starter Kit" width="300" style="margin:10px 0 5px 0;"/> <br>
-- remove the shell, get familiar with phone structure - how cardle works and how its get activated, garb multimeter and play around, understand what connect where, hear the beep, 
-- use NEt 425B block to find nececcery wires - we need two from dial and two from cradle
-- re,ove handle - ear peace? out the way by 
-- remove Ring (bells) block - leave if you are planning to use it - make phone ring - immiting reciving calls
-- unscrew dial, get familiar with the cunstruction, see the mechanics how it works
-- you will see 4 wires coming out from dial - two for dialing the number, 2 for preventin mic work and noise whr diaking in process
-we need to grab 2 that resmonsible for dialing in my case it is blue and green
-to check them use multimeter, tuch each wire in continuity test mode and dial the number you will hear beep with pauses equel to the number dialed - connection on and off. If you hear long beep withourt pauses - like me -your multimeter is not fat enogh to react to these interupted signals. What i did - i dialed a number and did not relesed it but slowly moved it with my hand - you will hear beeps equls to numvber dialed. it may rerquire some specific hand gymnastics. Thats where this alligator clips will be handy - i wish i got them 
-- when you found the wires responsible for dialind mark them, other two you can leave - you can use them for some additional logic - like play dialing sound - isolate the ends that they did not short, fold, tape, put out the way
+## Step 1 — Prepare the phone
+<img src="./without_shell.jpg" alt="phone without the shell" width="300" style="margin:10px 0 5px 0;"/> <br>
+- Remove the shell and get familiar with the mechanics—how the **cradle (hook switch)** works and how the **rotary dial** returns. Grab the multimeter and poke around (in continuity/beep mode). 
+- Use the NET 425B block as a map to trace wiring. We need:
+    - **Two wires from the dial** (the pulse contacts)
+    - **Two wires from the hook switch** (cradle)
+- Remove the handset - unscrew the wiring for the handset cord or cut them.
+- You can **remove the ringer (bells) module** if you’re not planning to make the phone ring. If you want incoming-call effects later, leave it
+<img src="./Bell_remove.jpg" alt="bell remove schema" width="300" style="margin:10px 0 5px 0;"/> <br>
+- Unscrew the dial, get familiar with the construction, see the mechanics how it works. You’ll usually find 4 wires:
+    - 2 wires = dial pulses (open/close while the dial returns)
+    - 2 wires = “mic mute” while dialing (prevents noise)
+    - We only need the pulse pair. Colors vary (mine were blue/green).
+- How to identify the pulse pair with a multimeter:
+    - Put the meter in continuity (beep) mode. Touch one probe to each candidate pair. Dial a number and let the dial return slowly. You should hear beep bursts that match the digit you dialed (e.g., “3” → three bursts).
+     >If your meter can’t keep up (mine couldn’t), hold the dial at the end of the rotation >and manually let it return slowly with your hand—you’ll hear the bursts. This is where >alligator clips really help—I wish I had them.<br>
+- Mark the pulse pair. The other two (mic-mute) can be isolated and taped out of the way for future experiments (e.g., fake “dialing” click sound).<br>
+<img src="./Dial.jpg" alt="phone without the shell" width="300" style="margin:10px 0 5px 0;"/> <br>
 - now to locate the cradle wires:  locate all wires coming of cradle mechanism, see where they connect to NEt 425B block. With multimeter find 2 that responsible for cradle. Cradle on - no signal, cardle lift long signal. mark them
 - uscrew/cut all the wires from NEt 425B block
 - now yu can remove NEt 425B block - i spend some time doind it, it got messy becouse the is some gue inside this block, nothing toxic or dangerous just too sticky, so i recoment to try and to drill out two pins on the buttom of the fnone that holds the block.I ended up removing the iner part of NEt 425B block, get myself and all around in this yacky vaselin-glue thing, ascking GPT to how to clean it from my hads (use WD-40 and dish soap), after i got this shell of NEt 425B block - i swing it back and force with Pliers, removed it and there was a metall thing underneth that i  ended up removing with the drill... So just try to trill it out from the back of phone - see image

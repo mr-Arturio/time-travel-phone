@@ -31,7 +31,7 @@ All of this is to create the feeling of a **phone conversation**, not a web demo
 6. You speak → **recording** stops after a short silence.
 7. After ~2s → **brief “thinking”** filler (randomized, in persona).
 8. **Reply** plays back in the same voice and style.
-
+___
 ### Requirements
 - **Server**: Linux host or GPU pod (RunPod/AWS/etc). CPU works; GPU recommended for faster LLM/Whisper.
 - **Raspberry Pi 4B** 4 GB or more with Raspberry Pi OS, Wi-Fi or Ethernet.
